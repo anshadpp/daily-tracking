@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../models/prayer.dart';
 import '../providers/tracker_provider.dart';
 import '../services/prayer_service.dart';
 import '../services/settings_service.dart';
