@@ -20,80 +20,112 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _future = AppDatabase.instance.getDailyStats(30);
   }
 
+  Future<void> _reload() async {
+    setState(() {
+      _future = AppDatabase.instance.getDailyStats(30);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<DailyStat>>(
-      future: _future,
-      builder: (ctx, snap) {
-        if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final stats = snap.data!.reversed.toList();
-        return ListView.separated(
-          padding: const EdgeInsets.all(12),
-          itemCount: stats.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (_, i) {
-            final s = stats[i];
-            final pct = (s.pct * 100).round();
-            final color = s.pct >= 0.8
-                ? Colors.green
-                : s.pct >= 0.5
-                    ? Colors.orange
-                    : Colors.red;
-            return InkWell(
-              onTap: () {
-                context.read<TrackerProvider>().setSelectedDate(s.date);
-                DefaultTabController.of(context).animateTo(0);
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    vertical: 12, horizontal: 8),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Stack(
-                        alignment: Alignment.center,
+    final cs = Theme.of(context).colorScheme;
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: FutureBuilder<List<DailyStat>>(
+        future: _future,
+        builder: (ctx, snap) {
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final stats = snap.data!.reversed.toList();
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            itemCount: stats.length,
+            itemBuilder: (_, i) {
+              final s = stats[i];
+              final pct = (s.pct * 100).round();
+              final color = s.pct >= 0.8
+                  ? const Color(0xFF2E7D32)
+                  : s.pct >= 0.5
+                      ? const Color(0xFFEF6C00)
+                      : s.pct > 0
+                          ? const Color(0xFFC62828)
+                          : cs.outline;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Material(
+                  color: cs.surfaceContainer,
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () {
+                      context.read<TrackerProvider>().setSelectedDate(s.date);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          behavior: SnackBarBehavior.floating,
+                          content: Text(
+                              'Switched to ${DateFormat('d MMM').format(s.date)} — see Today tab'),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
                         children: [
-                          CircularProgressIndicator(
-                            value: s.pct,
-                            strokeWidth: 4,
-                            backgroundColor:
-                                Colors.grey.withOpacity(0.2),
-                            valueColor: AlwaysStoppedAnimation(color),
+                          SizedBox(
+                            width: 48,
+                            height: 48,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  value: s.pct,
+                                  strokeWidth: 4,
+                                  backgroundColor:
+                                      cs.surfaceContainerHighest,
+                                  valueColor:
+                                      AlwaysStoppedAnimation(color),
+                                ),
+                                Text('$pct',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700)),
+                              ],
+                            ),
                           ),
-                          Text('$pct',
-                              style:
-                                  const TextStyle(fontSize: 11)),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  DateFormat('EEEE, d MMM yyyy')
+                                      .format(s.date),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 2),
+                                Text('${s.completed} / ${s.total} blocks',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                            color: cs.onSurfaceVariant)),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded,
+                              color: cs.onSurfaceVariant),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            DateFormat('EEE, d MMM yyyy').format(s.date),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 2),
-                          Text('${s.completed} / ${s.total} blocks',
-                              style: Theme.of(context).textTheme.bodySmall),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right),
-                  ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
