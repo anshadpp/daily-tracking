@@ -9,6 +9,7 @@ import '../models/prayer.dart';
 import '../services/notification_service.dart';
 import '../services/prayer_service.dart';
 import '../services/settings_service.dart';
+import '../services/widget_service.dart';
 
 class TrackerProvider extends ChangeNotifier {
   final AppDatabase _db = AppDatabase.instance;
@@ -80,6 +81,42 @@ class TrackerProvider extends ChangeNotifier {
     _holidays = await _db.getHolidays();
     _todayHoliday = await _db.getHolidayForDate(_selectedDateStr);
     notifyListeners();
+    _pushWidget();
+  }
+
+  void _pushWidget() {
+    final cur = currentBlock;
+    final cat = cur != null ? categoryById[cur.categoryId] : null;
+    DateTime? nextTime;
+    String? nextTitle;
+    if (cur == null) {
+      final now = DateTime.now();
+      final nowMin = now.hour * 60 + now.minute;
+      for (final b in blocksForSelectedDate) {
+        if (b.startMinutes > nowMin) {
+          nextTitle = b.title;
+          nextTime = DateTime(now.year, now.month, now.day,
+              b.startMinutes ~/ 60, b.startMinutes % 60);
+          break;
+        }
+      }
+    }
+    WidgetService.instance.push(
+      completed: completedCount,
+      total: totalCount,
+      currentBlock: cur,
+      currentCategory: cat,
+      nextTitle: nextTitle,
+      nextTime: nextTime,
+      prayers: prayersForSelectedDate,
+    );
+  }
+
+  Future<void> toggleCurrentFromWidget() async {
+    final b = currentBlock;
+    if (b != null) {
+      await toggle(b);
+    }
   }
 
   Future<void> setSelectedDate(DateTime d) async {

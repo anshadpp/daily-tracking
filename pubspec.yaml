@@ -20,9 +20,21 @@ dependencies:
   flutter_timezone: ^3.0.1
   shared_preferences: ^2.3.2
   adhan: ^2.0.0-nullsafety.2
+  home_widget: ^0.7.0
 
 dev_dependencies:
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/app_icon.png"
+  adaptive_icon_background: "#120A1F"
+  adaptive_icon_foreground: "assets/app_icon.png"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/app_icon.png

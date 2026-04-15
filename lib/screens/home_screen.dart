@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/tracker_provider.dart';
+import '../services/widget_service.dart';
 import '../widgets/glass.dart';
 import 'categories_screen.dart';
 import 'edit_blocks_screen.dart';
@@ -20,6 +23,40 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
   static const _titles = ['Today', 'History', 'Stats'];
+
+  StreamSubscription<Uri?>? _widgetSub;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final initial = await WidgetService.instance.launchedFrom();
+      if (initial != null) _handleUri(initial);
+    });
+    _widgetSub = WidgetService.instance.onLaunch.listen((uri) {
+      if (uri != null) _handleUri(uri);
+    });
+  }
+
+  @override
+  void dispose() {
+    _widgetSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleUri(Uri uri) {
+    if (!mounted) return;
+    if (uri.host == 'toggle-current') {
+      final tp = context.read<TrackerProvider>();
+      tp.toggleCurrentFromWidget();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Toggled current block'),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

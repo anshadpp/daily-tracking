@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Daily Tracker</string>
+    <string name="widget_description">Glance at your schedule, mark current block done</string>
+</resources>
