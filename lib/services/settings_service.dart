@@ -8,6 +8,7 @@ class AppSettings {
   static const _kPrayerEnabled = 'prayer_enabled';
   static const _kPrayerReminders = 'prayer_reminders';
   static const _kAsrJuristic = 'asr_juristic';
+  static const _kCurrency = 'currency_symbol';
 
   double latitude = 21.4225;
   double longitude = 39.8262;
@@ -16,6 +17,7 @@ class AppSettings {
   bool prayerEnabled = true;
   bool prayerReminders = true;
   String asrJuristic = 'standard';
+  String currencySymbol = '₹';
 
   static final AppSettings _i = AppSettings._();
   AppSettings._();
@@ -30,6 +32,7 @@ class AppSettings {
     prayerEnabled = p.getBool(_kPrayerEnabled) ?? prayerEnabled;
     prayerReminders = p.getBool(_kPrayerReminders) ?? prayerReminders;
     asrJuristic = p.getString(_kAsrJuristic) ?? asrJuristic;
+    currencySymbol = p.getString(_kCurrency) ?? currencySymbol;
   }
 
   Future<void> save() async {
@@ -41,6 +44,7 @@ class AppSettings {
     await p.setBool(_kPrayerEnabled, prayerEnabled);
     await p.setBool(_kPrayerReminders, prayerReminders);
     await p.setString(_kAsrJuristic, asrJuristic);
+    await p.setString(_kCurrency, currencySymbol);
   }
 }
 

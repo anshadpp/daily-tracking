@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import '../models/block.dart';
 import '../models/category.dart';
 import '../models/completion.dart';
+import '../models/expense.dart';
 import '../models/holiday.dart';
 import '../models/prayer.dart';
 import 'default_blocks.dart';
@@ -19,7 +20,7 @@ class AppDatabase {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dbPath, 'daily_tracker.db'),
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -80,6 +81,18 @@ class AppDatabase {
         UNIQUE(date, prayer)
       )
     ''');
+    await db.execute('''
+      CREATE TABLE expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        minutes_of_day INTEGER,
+        amount_cents INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        category_id INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX idx_expenses_date ON expenses(date)');
 
     final catIds = <String, int>{};
     for (final c in DefaultCategories.all()) {
@@ -161,6 +174,21 @@ class AppDatabase {
           UNIQUE(date, prayer)
         )
       ''');
+    }
+    if (oldV < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS expenses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          minutes_of_day INTEGER,
+          amount_cents INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          category_id INTEGER NOT NULL
+        )
+      ''');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)');
     }
   }
 
@@ -362,6 +390,74 @@ class AppDatabase {
     }
   }
 
+  // Expenses
+  Future<List<Expense>> getExpensesForDate(String date) async {
+    final db = await database;
+    final rows = await db.query('expenses',
+        where: 'date = ?',
+        whereArgs: [date],
+        orderBy: 'minutes_of_day DESC, id DESC');
+    return rows.map(Expense.fromMap).toList();
+  }
+
+  Future<int> insertExpense(Expense e) async {
+    final db = await database;
+    return db.insert('expenses', e.toMap()..remove('id'));
+  }
+
+  Future<void> updateExpense(Expense e) async {
+    final db = await database;
+    await db.update('expenses', e.toMap(),
+        where: 'id = ?', whereArgs: [e.id]);
+  }
+
+  Future<void> deleteExpense(int id) async {
+    final db = await database;
+    await db.delete('expenses', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Total spent per day (last [days] days, most recent last).
+  Future<List<DailyExpense>> getDailyExpenseTotals(int days) async {
+    final db = await database;
+    final today = DateTime.now();
+    final List<DailyExpense> result = [];
+    for (int i = days - 1; i >= 0; i--) {
+      final d = today.subtract(Duration(days: i));
+      final ds = _dateStr(d);
+      final sum = Sqflite.firstIntValue(await db.rawQuery(
+              'SELECT COALESCE(SUM(amount_cents), 0) FROM expenses WHERE date = ?',
+              [ds])) ??
+          0;
+      result.add(DailyExpense(date: d, amountCents: sum));
+    }
+    return result;
+  }
+
+  Future<int> getMonthTotalCents(DateTime month) async {
+    final db = await database;
+    final y = month.year.toString().padLeft(4, '0');
+    final m = month.month.toString().padLeft(2, '0');
+    final prefix = '$y-$m';
+    return Sqflite.firstIntValue(await db.rawQuery(
+            "SELECT COALESCE(SUM(amount_cents), 0) FROM expenses WHERE date LIKE '$prefix-%'",
+            [])) ??
+        0;
+  }
+
+  Future<Map<int, int>> getExpensesByCategoryForMonth(
+      DateTime month) async {
+    final db = await database;
+    final y = month.year.toString().padLeft(4, '0');
+    final m = month.month.toString().padLeft(2, '0');
+    final prefix = '$y-$m';
+    final rows = await db.rawQuery(
+        "SELECT category_id, SUM(amount_cents) AS s FROM expenses WHERE date LIKE '$prefix-%' GROUP BY category_id");
+    return {
+      for (final r in rows)
+        r['category_id'] as int: (r['s'] as int?) ?? 0,
+    };
+  }
+
   static String _dateStr(DateTime d) {
     final y = d.year.toString().padLeft(4, '0');
     final m = d.month.toString().padLeft(2, '0');
@@ -377,4 +473,11 @@ class DailyStat {
   DailyStat(
       {required this.date, required this.completed, required this.total});
   double get pct => total == 0 ? 0 : completed / total;
+}
+
+class DailyExpense {
+  final DateTime date;
+  final int amountCents;
+  DailyExpense({required this.date, required this.amountCents});
+  double get amount => amountCents / 100.0;
 }

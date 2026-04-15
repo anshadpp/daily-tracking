@@ -8,6 +8,7 @@ import '../services/widget_service.dart';
 import '../widgets/glass.dart';
 import 'categories_screen.dart';
 import 'edit_blocks_screen.dart';
+import 'expenses_screen.dart';
 import 'history_screen.dart';
 import 'holidays_screen.dart';
 import 'settings_screen.dart';
@@ -22,7 +23,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
-  static const _titles = ['Today', 'History', 'Stats'];
+  static const _titles = ['Today', 'Expenses', 'History', 'Stats'];
 
   StreamSubscription<Uri?>? _widgetSub;
 
@@ -150,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 index: _index,
                 children: const [
                   TodayScreen(),
+                  ExpensesScreen(),
                   HistoryScreen(),
                   StatsScreen(),
                 ],
@@ -175,18 +177,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   onTap: () => setState(() => _index = 0),
                 ),
                 _NavItem(
-                  icon: Icons.history_rounded,
-                  label: 'History',
+                  icon: Icons.account_balance_wallet_rounded,
+                  label: 'Expenses',
                   selected: _index == 1,
                   color: cs.primary,
                   onTap: () => setState(() => _index = 1),
                 ),
                 _NavItem(
-                  icon: Icons.insights_rounded,
-                  label: 'Stats',
+                  icon: Icons.history_rounded,
+                  label: 'History',
                   selected: _index == 2,
                   color: cs.primary,
                   onTap: () => setState(() => _index = 2),
+                ),
+                _NavItem(
+                  icon: Icons.insights_rounded,
+                  label: 'Stats',
+                  selected: _index == 3,
+                  color: cs.primary,
+                  onTap: () => setState(() => _index = 3),
                 ),
               ],
             ),
