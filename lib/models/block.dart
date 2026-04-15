@@ -1,4 +1,6 @@
 class Block {
+  // daysOfWeek bitmask — Monday=1 (DateTime.monday=1 .. Sunday=7 → bit = 1 << (weekday-1))
+  // 127 = all days.
   final int? id;
   final String title;
   final String description;
@@ -8,6 +10,8 @@ class Block {
   final int categoryId;
   final bool isActive;
   final bool notify;
+  final int daysOfWeek;
+  final String? specificDate; // YYYY-MM-DD, for one-off events
 
   Block({
     this.id,
@@ -19,7 +23,23 @@ class Block {
     required this.categoryId,
     this.isActive = true,
     this.notify = true,
+    this.daysOfWeek = 127,
+    this.specificDate,
   });
+
+  bool get isEvent => specificDate != null;
+
+  bool occursOn(DateTime date) {
+    if (specificDate != null) {
+      final ds = _dateStr(date);
+      return specificDate == ds;
+    }
+    final bit = 1 << (date.weekday - 1); // Monday=1 → bit 1
+    return (daysOfWeek & bit) != 0;
+  }
+
+  static String _dateStr(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   String get startLabel => _fmt(startMinutes);
   String get endLabel => _fmt(endMinutes);
@@ -42,6 +62,8 @@ class Block {
         'category_id': categoryId,
         'is_active': isActive ? 1 : 0,
         'notify': notify ? 1 : 0,
+        'days_of_week': daysOfWeek,
+        'specific_date': specificDate,
       };
 
   factory Block.fromMap(Map<String, dynamic> m) => Block(
@@ -54,6 +76,8 @@ class Block {
         categoryId: (m['category_id'] as int?) ?? 1,
         isActive: (m['is_active'] as int) == 1,
         notify: (m['notify'] as int? ?? 1) == 1,
+        daysOfWeek: (m['days_of_week'] as int?) ?? 127,
+        specificDate: m['specific_date'] as String?,
       );
 
   Block copyWith({
@@ -66,6 +90,8 @@ class Block {
     int? categoryId,
     bool? isActive,
     bool? notify,
+    int? daysOfWeek,
+    Object? specificDate = _sentinel,
   }) =>
       Block(
         id: id ?? this.id,
@@ -77,5 +103,35 @@ class Block {
         categoryId: categoryId ?? this.categoryId,
         isActive: isActive ?? this.isActive,
         notify: notify ?? this.notify,
+        daysOfWeek: daysOfWeek ?? this.daysOfWeek,
+        specificDate: identical(specificDate, _sentinel)
+            ? this.specificDate
+            : specificDate as String?,
       );
+}
+
+const _sentinel = Object();
+
+class DaysOfWeek {
+  static const int all = 127; // 1111111
+  static const int weekdays = 31; // Mon..Fri = 1+2+4+8+16
+  static const int weekends = 96; // Sat(32)+Sun(64)
+  static const int none = 0;
+
+  static int bit(int weekday) => 1 << (weekday - 1);
+  static bool has(int mask, int weekday) => (mask & bit(weekday)) != 0;
+
+  static const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  static String label(int mask) {
+    if (mask == all) return 'Every day';
+    if (mask == weekdays) return 'Weekdays';
+    if (mask == weekends) return 'Weekends';
+    if (mask == 0) return 'Never';
+    final picked = <String>[];
+    for (int i = 1; i <= 7; i++) {
+      if (has(mask, i)) picked.add(names[i - 1]);
+    }
+    return picked.join(', ');
+  }
 }

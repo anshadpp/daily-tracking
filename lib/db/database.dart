@@ -4,6 +4,8 @@ import 'package:sqflite/sqflite.dart';
 import '../models/block.dart';
 import '../models/category.dart';
 import '../models/completion.dart';
+import '../models/holiday.dart';
+import '../models/prayer.dart';
 import 'default_blocks.dart';
 
 class AppDatabase {
@@ -17,7 +19,7 @@ class AppDatabase {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dbPath, 'daily_tracker.db'),
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -44,7 +46,9 @@ class AppDatabase {
         order_index INTEGER NOT NULL,
         category_id INTEGER NOT NULL,
         is_active INTEGER NOT NULL DEFAULT 1,
-        notify INTEGER NOT NULL DEFAULT 1
+        notify INTEGER NOT NULL DEFAULT 1,
+        days_of_week INTEGER NOT NULL DEFAULT 127,
+        specific_date TEXT
       )
     ''');
     await db.execute('''
@@ -59,6 +63,23 @@ class AppDatabase {
       )
     ''');
     await db.execute('CREATE INDEX idx_completions_date ON completions(date)');
+    await db.execute('''
+      CREATE TABLE holidays (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE prayer_completions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        prayer TEXT NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        completed_at_minutes INTEGER,
+        UNIQUE(date, prayer)
+      )
+    ''');
 
     final catIds = <String, int>{};
     for (final c in DefaultCategories.all()) {
@@ -113,6 +134,34 @@ class AppDatabase {
         );
       }
     }
+    if (oldV < 3) {
+      final cols = await db.rawQuery('PRAGMA table_info(blocks)');
+      final has = (String n) => cols.any((c) => c['name'] == n);
+      if (!has('days_of_week')) {
+        await db.execute(
+            'ALTER TABLE blocks ADD COLUMN days_of_week INTEGER NOT NULL DEFAULT 127');
+      }
+      if (!has('specific_date')) {
+        await db.execute('ALTER TABLE blocks ADD COLUMN specific_date TEXT');
+      }
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS holidays (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS prayer_completions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          prayer TEXT NOT NULL,
+          completed INTEGER NOT NULL DEFAULT 0,
+          completed_at_minutes INTEGER,
+          UNIQUE(date, prayer)
+        )
+      ''');
+    }
   }
 
   // Categories
@@ -150,7 +199,7 @@ class AppDatabase {
     final rows = await db.query(
       'blocks',
       where: activeOnly ? 'is_active = 1' : null,
-      orderBy: 'order_index ASC, start_minutes ASC',
+      orderBy: 'start_minutes ASC, order_index ASC',
     );
     return rows.map(Block.fromMap).toList();
   }
@@ -246,6 +295,71 @@ class AppDatabase {
       [start, end],
     );
     return {for (final r in rows) r['block_id'] as int: r['c'] as int};
+  }
+
+  // Holidays
+  Future<List<Holiday>> getHolidays() async {
+    final db = await database;
+    final rows = await db.query('holidays', orderBy: 'date DESC');
+    return rows.map(Holiday.fromMap).toList();
+  }
+
+  Future<Holiday?> getHolidayForDate(String date) async {
+    final db = await database;
+    final rows =
+        await db.query('holidays', where: 'date = ?', whereArgs: [date]);
+    return rows.isEmpty ? null : Holiday.fromMap(rows.first);
+  }
+
+  Future<int> insertHoliday(Holiday h) async {
+    final db = await database;
+    return db.insert('holidays', h.toMap()..remove('id'),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> deleteHoliday(int id) async {
+    final db = await database;
+    await db.delete('holidays', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Prayer completions
+  Future<Map<String, PrayerCompletion>> getPrayerCompletions(
+      String date) async {
+    final db = await database;
+    final rows = await db
+        .query('prayer_completions', where: 'date = ?', whereArgs: [date]);
+    return {
+      for (final r in rows.map(PrayerCompletion.fromMap)) r.prayer: r,
+    };
+  }
+
+  Future<void> setPrayerCompletion({
+    required String date,
+    required String prayer,
+    required bool completed,
+    int? completedAtMinutes,
+  }) async {
+    final db = await database;
+    final existing = await db.query('prayer_completions',
+        where: 'date = ? AND prayer = ?', whereArgs: [date, prayer]);
+    if (existing.isEmpty) {
+      await db.insert('prayer_completions', {
+        'date': date,
+        'prayer': prayer,
+        'completed': completed ? 1 : 0,
+        'completed_at_minutes': completedAtMinutes,
+      });
+    } else {
+      await db.update(
+        'prayer_completions',
+        {
+          'completed': completed ? 1 : 0,
+          'completed_at_minutes': completedAtMinutes,
+        },
+        where: 'date = ? AND prayer = ?',
+        whereArgs: [date, prayer],
+      );
+    }
   }
 
   static String _dateStr(DateTime d) {

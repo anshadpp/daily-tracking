@@ -9,6 +9,7 @@ class BlockSeed {
   final int endMinutes;
   final int orderIndex;
   final String categoryName;
+  final int daysOfWeek;
 
   const BlockSeed({
     required this.title,
@@ -17,6 +18,7 @@ class BlockSeed {
     required this.endMinutes,
     required this.orderIndex,
     required this.categoryName,
+    this.daysOfWeek = 127,
   });
 
   Block toBlock(int categoryId) => Block(
@@ -26,6 +28,7 @@ class BlockSeed {
         endMinutes: endMinutes,
         orderIndex: orderIndex,
         categoryId: categoryId,
+        daysOfWeek: daysOfWeek,
       );
 }
 
@@ -45,6 +48,7 @@ final List<BlockSeed> defaultBlockSeeds = [
     endMinutes: _t(7, 15),
     orderIndex: 1,
     categoryName: 'Travel 360',
+    daysOfWeek: 31, // weekdays only
   ),
   BlockSeed(
     title: 'Deep Work — Travel 360',

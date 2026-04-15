@@ -56,7 +56,7 @@ class EditBlocksScreen extends StatelessWidget {
                                   fontWeight: FontWeight.w700)),
                           const SizedBox(height: 2),
                           Text(
-                            '${b.rangeLabel}  •  ${c?.name ?? '—'}',
+                            '${b.rangeLabel}  •  ${c?.name ?? '—'}  •  ${b.isEvent ? '📅 ${b.specificDate}' : DaysOfWeek.label(b.daysOfWeek)}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -146,6 +146,11 @@ class EditBlocksScreen extends StatelessWidget {
     int categoryId = existing?.categoryId ??
         (tp.categories.isNotEmpty ? tp.categories.first.id! : 1);
     bool notify = existing?.notify ?? true;
+    int daysOfWeek = existing?.daysOfWeek ?? DaysOfWeek.all;
+    bool isEvent = existing?.specificDate != null;
+    DateTime? specificDate = existing?.specificDate != null
+        ? DateTime.parse(existing!.specificDate!)
+        : null;
 
     showModalBottomSheet(
       context: context,
@@ -256,6 +261,101 @@ class EditBlocksScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 18),
+                  SwitchListTile(
+                    title: const Text('One-off event'),
+                    subtitle: const Text(
+                        'Only appears on a specific date, not recurring'),
+                    value: isEvent,
+                    onChanged: (v) => setState(() {
+                      isEvent = v;
+                      if (v) {
+                        specificDate ??= DateTime.now();
+                      } else {
+                        specificDate = null;
+                      }
+                    }),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  if (isEvent) ...[
+                    const SizedBox(height: 8),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: specificDate ?? DateTime.now(),
+                          firstDate: DateTime.now()
+                              .subtract(const Duration(days: 30)),
+                          lastDate: DateTime.now()
+                              .add(const Duration(days: 365 * 2)),
+                        );
+                        if (picked != null) {
+                          setState(() => specificDate = picked);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Theme.of(ctx)
+                                .colorScheme
+                                .outline
+                                .withOpacity(0.4),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.event_rounded),
+                            const SizedBox(width: 10),
+                            Text(
+                              specificDate == null
+                                  ? 'Pick date'
+                                  : '${specificDate!.year}-${specificDate!.month.toString().padLeft(2, '0')}-${specificDate!.day.toString().padLeft(2, '0')}',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 10),
+                    const _SectionLabel('REPEATS ON'),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        for (int i = 1; i <= 7; i++)
+                          _DayToggle(
+                            label: DaysOfWeek.names[i - 1],
+                            selected: DaysOfWeek.has(daysOfWeek, i),
+                            onTap: () => setState(() {
+                              daysOfWeek ^= DaysOfWeek.bit(i);
+                            }),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        _Preset(
+                            label: 'Every day',
+                            onTap: () => setState(
+                                () => daysOfWeek = DaysOfWeek.all)),
+                        _Preset(
+                            label: 'Weekdays',
+                            onTap: () => setState(
+                                () => daysOfWeek = DaysOfWeek.weekdays)),
+                        _Preset(
+                            label: 'Weekends',
+                            onTap: () => setState(
+                                () => daysOfWeek = DaysOfWeek.weekends)),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   SwitchListTile(
                     title: const Text('Daily reminder'),
@@ -295,6 +395,10 @@ class EditBlocksScreen extends StatelessWidget {
                           endMinutes: eM,
                           categoryId: categoryId,
                           notify: notify,
+                          daysOfWeek: isEvent ? DaysOfWeek.all : daysOfWeek,
+                          specificDate: isEvent && specificDate != null
+                              ? '${specificDate!.year}-${specificDate!.month.toString().padLeft(2, '0')}-${specificDate!.day.toString().padLeft(2, '0')}'
+                              : null,
                         );
                         tp.upsertBlock(block);
                         Navigator.pop(ctx);
@@ -426,4 +530,59 @@ class _SectionLabel extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       );
+}
+
+class _DayToggle extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _DayToggle(
+      {required this.label, required this.selected, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: selected ? cs.primary : Colors.transparent,
+          border: Border.all(
+            color: selected ? cs.primary : cs.outline.withOpacity(0.5),
+            width: selected ? 0 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: selected ? cs.onPrimary : cs.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Preset extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _Preset({required this.label, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999)),
+      ),
+      child: Text(label),
+    );
+  }
 }

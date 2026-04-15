@@ -4,7 +4,11 @@ import '../db/database.dart';
 import '../models/block.dart';
 import '../models/category.dart';
 import '../models/completion.dart';
+import '../models/holiday.dart';
+import '../models/prayer.dart';
 import '../services/notification_service.dart';
+import '../services/prayer_service.dart';
+import '../services/settings_service.dart';
 
 class TrackerProvider extends ChangeNotifier {
   final AppDatabase _db = AppDatabase.instance;
@@ -12,42 +16,77 @@ class TrackerProvider extends ChangeNotifier {
   List<Block> _blocks = [];
   List<AppCategory> _categories = [];
   Map<int, Completion> _todayCompletions = {};
+  Map<String, PrayerCompletion> _prayerCompletions = {};
+  List<Holiday> _holidays = [];
+  Holiday? _todayHoliday;
   DateTime _selectedDate = DateTime.now();
 
   List<Block> get blocks => _blocks;
   List<AppCategory> get categories => _categories;
+  List<Holiday> get holidays => _holidays;
+  Holiday? get todayHoliday => _todayHoliday;
   Map<int, AppCategory> get categoryById =>
       {for (final c in _categories) c.id!: c};
   Map<int, Completion> get todayCompletions => _todayCompletions;
+  Map<String, PrayerCompletion> get prayerCompletions => _prayerCompletions;
   DateTime get selectedDate => _selectedDate;
 
   AppCategory? categoryFor(Block b) => categoryById[b.categoryId];
 
-  String get _selectedDateStr {
-    final d = _selectedDate;
-    return '${d.year.toString().padLeft(4, '0')}-'
-        '${d.month.toString().padLeft(2, '0')}-'
-        '${d.day.toString().padLeft(2, '0')}';
+  List<Block> get blocksForSelectedDate =>
+      _blocks.where((b) => b.occursOn(_selectedDate)).toList()
+        ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+
+  List<PrayerInstance> get prayersForSelectedDate {
+    if (!AppSettings.I.prayerEnabled) return const [];
+    final computed = PrayerService.instance.forDate(_selectedDate);
+    return computed
+        .map((p) => PrayerInstance(
+              name: p.name,
+              time: p.time,
+              completed:
+                  _prayerCompletions[p.name.key]?.completed ?? false,
+            ))
+        .toList();
   }
+
+  String get _selectedDateStr => _dateStr(_selectedDate);
+
+  static String _dateStr(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   bool isCompleted(int blockId) =>
       _todayCompletions[blockId]?.completed ?? false;
 
-  int get completedCount =>
-      _blocks.where((b) => b.id != null && isCompleted(b.id!)).length;
+  int get completedCount {
+    final bs = blocksForSelectedDate;
+    int n = bs.where((b) => b.id != null && isCompleted(b.id!)).length;
+    for (final p in prayersForSelectedDate) {
+      if (p.completed) n++;
+    }
+    return n;
+  }
 
-  double get progress => _blocks.isEmpty ? 0 : completedCount / _blocks.length;
+  int get totalCount =>
+      blocksForSelectedDate.length + prayersForSelectedDate.length;
+
+  double get progress => totalCount == 0 ? 0 : completedCount / totalCount;
 
   Future<void> load() async {
     _categories = await _db.getCategories();
     _blocks = await _db.getBlocks(activeOnly: true);
     _todayCompletions = await _db.getCompletionsForDate(_selectedDateStr);
+    _prayerCompletions = await _db.getPrayerCompletions(_selectedDateStr);
+    _holidays = await _db.getHolidays();
+    _todayHoliday = await _db.getHolidayForDate(_selectedDateStr);
     notifyListeners();
   }
 
   Future<void> setSelectedDate(DateTime d) async {
     _selectedDate = DateTime(d.year, d.month, d.day);
     _todayCompletions = await _db.getCompletionsForDate(_selectedDateStr);
+    _prayerCompletions = await _db.getPrayerCompletions(_selectedDateStr);
+    _todayHoliday = await _db.getHolidayForDate(_selectedDateStr);
     notifyListeners();
   }
 
@@ -62,6 +101,18 @@ class TrackerProvider extends ChangeNotifier {
       completedAtMinutes: !current ? now.hour * 60 + now.minute : null,
     );
     _todayCompletions = await _db.getCompletionsForDate(_selectedDateStr);
+    notifyListeners();
+  }
+
+  Future<void> togglePrayer(PrayerInstance p) async {
+    final now = DateTime.now();
+    await _db.setPrayerCompletion(
+      date: _selectedDateStr,
+      prayer: p.name.key,
+      completed: !p.completed,
+      completedAtMinutes: !p.completed ? now.hour * 60 + now.minute : null,
+    );
+    _prayerCompletions = await _db.getPrayerCompletions(_selectedDateStr);
     notifyListeners();
   }
 
@@ -108,6 +159,16 @@ class TrackerProvider extends ChangeNotifier {
     await load();
   }
 
+  Future<void> addHoliday(DateTime date, String name) async {
+    await _db.insertHoliday(Holiday(date: _dateStr(date), name: name));
+    await load();
+  }
+
+  Future<void> deleteHoliday(int id) async {
+    await _db.deleteHoliday(id);
+    await load();
+  }
+
   Future<void> rescheduleNotifications() async {
     await NotificationService.instance.rescheduleAll(_blocks, categoryById);
   }
@@ -115,9 +176,14 @@ class TrackerProvider extends ChangeNotifier {
   Block? get currentBlock {
     final now = DateTime.now();
     final mins = now.hour * 60 + now.minute;
+    final today = _sameDay(_selectedDate, now) ? _selectedDate : now;
     for (final b in _blocks) {
+      if (!b.occursOn(today)) continue;
       if (mins >= b.startMinutes && mins < b.endMinutes) return b;
     }
     return null;
   }
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 }

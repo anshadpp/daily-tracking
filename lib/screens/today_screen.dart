@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../models/block.dart';
 import '../models/category.dart';
+import '../models/prayer.dart';
 import '../providers/tracker_provider.dart';
 import '../widgets/block_card.dart';
 import '../widgets/glass.dart';
@@ -39,8 +40,11 @@ class _TodayScreenState extends State<TodayScreen> {
     final tp = context.watch<TrackerProvider>();
     final isToday = _sameDay(tp.selectedDate, DateTime.now());
     final current = isToday ? tp.currentBlock : null;
-    final next = isToday ? _nextBlock(tp) : null;
+    final blocks = tp.blocksForSelectedDate;
+    final prayers = tp.prayersForSelectedDate;
+    final next = isToday ? _nextItem(blocks, prayers) : null;
     final cats = tp.categoryById;
+    final holiday = tp.todayHoliday;
 
     return SafeArea(
       bottom: false,
@@ -58,51 +62,110 @@ class _TodayScreenState extends State<TodayScreen> {
                     tp.selectedDate.add(const Duration(days: 1))),
             onTapToday: () => tp.setSelectedDate(DateTime.now()),
           ),
+          if (holiday != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Glass(
+                borderRadius: BorderRadius.circular(18),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_busy_rounded),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Holiday — ${holiday.name}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800),
+                          ),
+                          Text(
+                            'Schedule is optional today. Rest up.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
             child: _ProgressHero(
               completed: tp.completedCount,
-              total: tp.blocks.length,
+              total: tp.totalCount,
               progress: tp.progress,
-              current: current,
+              currentBlock: current,
               currentCategory:
                   current != null ? cats[current.categoryId] : null,
-              next: next,
-              nextCategory: next != null ? cats[next.categoryId] : null,
+              nextLabel: next?.$1,
+              nextTime: next?.$2,
+              nextColor: next?.$3,
             ),
           ),
-          if (tp.blocks.isEmpty)
+          if (prayers.isNotEmpty) ...[
+            const _SectionHeader('Prayers', Icons.mosque_rounded),
+            for (final p in prayers)
+              _PrayerCard(
+                prayer: p,
+                onToggle: () => tp.togglePrayer(p),
+              ),
+            const SizedBox(height: 8),
+          ],
+          if (blocks.isNotEmpty) ...[
+            const _SectionHeader('Schedule', Icons.view_agenda_rounded),
+            for (final b in blocks)
+              BlockCard(
+                block: b,
+                category: cats[b.categoryId],
+                completed: b.id != null && tp.isCompleted(b.id!),
+                isCurrent: current?.id == b.id,
+                onToggle: () => tp.toggle(b),
+                onLongPress: () => _editNote(context, tp, b),
+              ),
+          ],
+          if (blocks.isEmpty && prayers.isEmpty)
             Padding(
               padding: const EdgeInsets.all(32),
               child: Center(
                 child: Text(
-                  'No blocks yet. Tap the tune icon to add some.',
+                  'Nothing scheduled. Open Edit to add blocks.',
                   style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      color:
+                          Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
-            ),
-          for (final b in tp.blocks)
-            BlockCard(
-              block: b,
-              category: cats[b.categoryId],
-              completed: b.id != null && tp.isCompleted(b.id!),
-              isCurrent: current?.id == b.id,
-              onToggle: () => tp.toggle(b),
-              onLongPress: () => _editNote(context, tp, b),
             ),
         ],
       ),
     );
   }
 
-  Block? _nextBlock(TrackerProvider tp) {
+  (String, DateTime, Color)? _nextItem(
+      List<Block> blocks, List<PrayerInstance> prayers) {
     final now = DateTime.now();
-    final mins = now.hour * 60 + now.minute;
-    for (final b in tp.blocks) {
-      if (b.startMinutes > mins) return b;
+    (String, DateTime, Color)? best;
+    for (final p in prayers) {
+      if (p.time.isAfter(now)) {
+        if (best == null || p.time.isBefore(best.$2)) {
+          best = (p.name.label, p.time, const Color(0xFF00695C));
+        }
+      }
     }
-    return null;
+    for (final b in blocks) {
+      final dt = DateTime(
+          now.year, now.month, now.day, b.startMinutes ~/ 60, b.startMinutes % 60);
+      if (dt.isAfter(now)) {
+        if (best == null || dt.isBefore(best.$2)) {
+          best = (b.title, dt, const Color(0xFF2E7D32));
+        }
+      }
+    }
+    return best;
   }
 
   void _editNote(BuildContext context, TrackerProvider tp, Block b) {
@@ -165,6 +228,138 @@ class _TodayScreenState extends State<TodayScreen> {
       a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
+class _SectionHeader extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  const _SectionHeader(this.label, this.icon);
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 16, 22, 8),
+      child: Row(
+        children: [
+          Icon(icon,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.6,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrayerCard extends StatelessWidget {
+  final PrayerInstance prayer;
+  final VoidCallback onToggle;
+  const _PrayerCard({required this.prayer, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    const prayerColor = Color(0xFF00695C);
+    final now = DateTime.now();
+    final isNow = now.isAfter(prayer.time) &&
+        now.isBefore(prayer.time.add(const Duration(minutes: 45)));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: GestureDetector(
+        onTap: onToggle,
+        child: Glass(
+          borderRadius: BorderRadius.circular(20),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          border: Border.all(
+            color: isNow
+                ? prayerColor.withOpacity(0.6)
+                : Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.white.withOpacity(0.6),
+            width: isNow ? 1.5 : 1,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: [
+                    prayerColor.withOpacity(0.35),
+                    prayerColor.withOpacity(0.15),
+                  ]),
+                  border: Border.all(color: prayerColor.withOpacity(0.5)),
+                ),
+                child: Icon(prayer.name.icon, color: prayerColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      prayer.name.label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: prayer.completed
+                            ? cs.onSurfaceVariant
+                            : cs.onSurface,
+                        decoration: prayer.completed
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      DateFormat('HH:mm').format(prayer.time),
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: onToggle,
+                behavior: HitTestBehavior.opaque,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color:
+                        prayer.completed ? prayerColor : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: prayer.completed
+                          ? prayerColor
+                          : cs.outline.withOpacity(0.6),
+                      width: 2,
+                    ),
+                  ),
+                  child: prayer.completed
+                      ? const Icon(Icons.check_rounded,
+                          color: Colors.white, size: 18)
+                      : null,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DateHeader extends StatelessWidget {
   final DateTime selected;
   final bool isToday;
@@ -207,10 +402,11 @@ class _DateHeader extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       DateFormat('EEEE, d MMM').format(selected),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.2,
-                          ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(
+                              fontWeight: FontWeight.w700, letterSpacing: -0.2),
                     ),
                   ],
                 ),
@@ -247,26 +443,42 @@ class _ProgressHero extends StatelessWidget {
   final int completed;
   final int total;
   final double progress;
-  final Block? current;
+  final Block? currentBlock;
   final AppCategory? currentCategory;
-  final Block? next;
-  final AppCategory? nextCategory;
+  final String? nextLabel;
+  final DateTime? nextTime;
+  final Color? nextColor;
   const _ProgressHero({
     required this.completed,
     required this.total,
     required this.progress,
-    required this.current,
+    required this.currentBlock,
     required this.currentCategory,
-    required this.next,
-    required this.nextCategory,
+    required this.nextLabel,
+    required this.nextTime,
+    required this.nextColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final highlight = currentCategory?.color ??
-        nextCategory?.color ??
-        cs.primary;
+    final highlight =
+        currentCategory?.color ?? nextColor ?? cs.primary;
+
+    final title = currentBlock?.title ?? nextLabel ?? 'Wrap up the day';
+    final status =
+        currentBlock != null ? 'NOW' : (nextLabel != null ? 'UP NEXT' : 'ALL DONE');
+    String sub;
+    if (currentBlock != null) {
+      sub =
+          '${currentBlock!.rangeLabel}  •  ends in ${_untilMin(currentBlock!.endMinutes)}';
+    } else if (nextTime != null) {
+      final diff = nextTime!.difference(DateTime.now());
+      sub =
+          '${DateFormat('HH:mm').format(nextTime!)}  •  in ${_untilDuration(diff)}';
+    } else {
+      sub = 'Great work today';
+    }
 
     return Glass(
       borderRadius: BorderRadius.circular(28),
@@ -302,9 +514,7 @@ class _ProgressHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  current != null
-                      ? 'NOW'
-                      : (next != null ? 'UP NEXT' : 'ALL DONE'),
+                  status,
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -314,7 +524,7 @@ class _ProgressHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  current?.title ?? next?.title ?? 'Wrap up the day',
+                  title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -323,14 +533,7 @@ class _ProgressHero extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  current != null
-                      ? '${current!.rangeLabel}  •  ends in ${_until(current!.endMinutes)}'
-                      : next != null
-                          ? '${next!.rangeLabel}  •  in ${_until(next!.startMinutes)}'
-                          : 'Great work today',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                Text(sub, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),
@@ -339,15 +542,19 @@ class _ProgressHero extends StatelessWidget {
     );
   }
 
-  String _until(int targetMinutes) {
+  String _untilMin(int targetMinutes) {
     final now = DateTime.now();
     final nowMin = now.hour * 60 + now.minute;
     final diff = targetMinutes - nowMin;
     if (diff <= 0) return 'now';
     if (diff < 60) return '$diff min';
-    final h = diff ~/ 60;
-    final m = diff % 60;
-    return m == 0 ? '${h}h' : '${h}h ${m}m';
+    return '${diff ~/ 60}h ${diff % 60}m';
+  }
+
+  String _untilDuration(Duration d) {
+    if (d.inMinutes < 1) return 'now';
+    if (d.inMinutes < 60) return '${d.inMinutes} min';
+    return '${d.inHours}h ${d.inMinutes % 60}m';
   }
 }
 

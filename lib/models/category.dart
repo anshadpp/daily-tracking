@@ -88,9 +88,43 @@ class DefaultCategories {
     iconCodePoint: Icons.restaurant_rounded.codePoint,
     isBuiltIn: true,
   );
+  static final prayer = AppCategory(
+    name: 'Prayer',
+    colorValue: 0xFF00695C,
+    iconCodePoint: Icons.mosque_rounded.codePoint,
+    isBuiltIn: true,
+  );
+  static final hadith = AppCategory(
+    name: 'Hadith',
+    colorValue: 0xFF4E342E,
+    iconCodePoint: Icons.menu_book_rounded.codePoint,
+    isBuiltIn: true,
+  );
+  static final myCompany = AppCategory(
+    name: 'My Company',
+    colorValue: 0xFFAD1457,
+    iconCodePoint: Icons.rocket_launch_rounded.codePoint,
+    isBuiltIn: true,
+  );
+  static final event = AppCategory(
+    name: 'Event',
+    colorValue: 0xFF3949AB,
+    iconCodePoint: Icons.event_rounded.codePoint,
+    isBuiltIn: true,
+  );
 
-  static List<AppCategory> all() =>
-      [travel360, incube, rest, exam, skill, meal];
+  static List<AppCategory> all() => [
+        travel360,
+        incube,
+        rest,
+        exam,
+        skill,
+        meal,
+        prayer,
+        hadith,
+        myCompany,
+        event,
+      ];
 }
 
 class CategoryPalette {

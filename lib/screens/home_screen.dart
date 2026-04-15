@@ -6,6 +6,8 @@ import '../widgets/glass.dart';
 import 'categories_screen.dart';
 import 'edit_blocks_screen.dart';
 import 'history_screen.dart';
+import 'holidays_screen.dart';
+import 'settings_screen.dart';
 import 'stats_screen.dart';
 import 'today_screen.dart';
 
@@ -41,6 +43,26 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                     ),
                     const Spacer(),
+                    _GlassAction(
+                      icon: Icons.event_busy_outlined,
+                      tooltip: 'Holidays',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const HolidaysScreen()),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _GlassAction(
+                      icon: Icons.settings_outlined,
+                      tooltip: 'Settings',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SettingsScreen()),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     _GlassAction(
                       icon: Icons.palette_outlined,
                       tooltip: 'Categories',
