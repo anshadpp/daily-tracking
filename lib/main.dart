@@ -60,7 +60,7 @@ class DailyTrackerApp extends StatelessWidget {
           letterSpacing: -0.3,
         ),
       ),
-      cardTheme: const CardTheme(
+      cardTheme: const CardThemeData(
         elevation: 0,
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
