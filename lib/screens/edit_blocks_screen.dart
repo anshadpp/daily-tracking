@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/block.dart';
+import '../models/category.dart';
 import '../providers/tracker_provider.dart';
+import '../widgets/glass.dart';
+import 'categories_screen.dart';
 
 class EditBlocksScreen extends StatelessWidget {
   const EditBlocksScreen({super.key});
@@ -10,41 +13,95 @@ class EditBlocksScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tp = context.watch<TrackerProvider>();
+    final cats = tp.categoryById;
     return Scaffold(
-      body: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 100),
-        itemCount: tp.blocks.length,
-        itemBuilder: (_, i) {
-          final b = tp.blocks[i];
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: b.priority.color.withOpacity(0.15),
-              child: Icon(Icons.schedule, color: b.priority.color, size: 18),
-            ),
-            title: Text(b.title),
-            subtitle: Text('${b.rangeLabel} • ${b.priority.label}'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Switch(
-                  value: b.notify,
-                  onChanged: (v) =>
-                      tp.upsertBlock(b.copyWith(notify: v)),
+      body: GlassBackground(
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 140),
+          itemCount: tp.blocks.length,
+          itemBuilder: (_, i) {
+            final b = tp.blocks[i];
+            final c = cats[b.categoryId];
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Glass(
+                borderRadius: BorderRadius.circular(20),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: (c?.color ?? Colors.grey).withOpacity(0.18),
+                        border: Border.all(
+                            color: (c?.color ?? Colors.grey)
+                                .withOpacity(0.4)),
+                      ),
+                      child: Icon(
+                        c?.icon ?? Icons.schedule_rounded,
+                        color: c?.color,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(b.title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${b.rangeLabel}  •  ${c?.name ?? '—'}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: b.notify,
+                      onChanged: (v) =>
+                          tp.upsertBlock(b.copyWith(notify: v)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit_rounded),
+                      onPressed: () => _editBlockDialog(context, tp, b),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      onPressed: () => _confirmDelete(context, tp, b),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => _confirmDelete(context, tp, b),
-                ),
-              ],
-            ),
-            onTap: () => _editBlockDialog(context, tp, b),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        icon: const Icon(Icons.add),
-        label: const Text('New block'),
-        onPressed: () => _editBlockDialog(context, tp, null),
+      floatingActionButton: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'cats',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const CategoriesScreen()),
+            ),
+            child: const Icon(Icons.palette_rounded),
+          ),
+          const SizedBox(width: 12),
+          FloatingActionButton.extended(
+            heroTag: 'new',
+            onPressed: () => _editBlockDialog(context, tp, null),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('New block'),
+          ),
+        ],
       ),
     );
   }
@@ -75,8 +132,7 @@ class EditBlocksScreen extends StatelessWidget {
   void _editBlockDialog(
       BuildContext context, TrackerProvider tp, Block? existing) {
     final titleCtrl = TextEditingController(text: existing?.title ?? '');
-    final descCtrl =
-        TextEditingController(text: existing?.description ?? '');
+    final descCtrl = TextEditingController(text: existing?.description ?? '');
     TimeOfDay start = existing == null
         ? const TimeOfDay(hour: 9, minute: 0)
         : TimeOfDay(
@@ -87,116 +143,287 @@ class EditBlocksScreen extends StatelessWidget {
         : TimeOfDay(
             hour: existing.endMinutes ~/ 60,
             minute: existing.endMinutes % 60);
-    Priority priority = existing?.priority ?? Priority.core;
+    int categoryId = existing?.categoryId ??
+        (tp.categories.isNotEmpty ? tp.categories.first.id! : 1);
     bool notify = existing?.notify ?? true;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: Text(existing == null ? 'New block' : 'Edit block'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleCtrl,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: descCtrl,
-                  decoration: const InputDecoration(labelText: 'Description'),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          final t = await showTimePicker(
-                              context: ctx, initialTime: start);
-                          if (t != null) setState(() => start = t);
-                        },
-                        child: Text('Start: ${start.format(ctx)}'),
+        builder: (ctx, setState) => Padding(
+          padding: EdgeInsets.only(
+            left: 12,
+            right: 12,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 12,
+          ),
+          child: Glass(
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(28)),
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    existing == null ? 'New block' : 'Edit block',
+                    style: Theme.of(ctx).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(controller: titleCtrl, decoration: _deco('Title')),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: descCtrl,
+                    decoration: _deco('Description (optional)'),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TimePill(
+                          label: 'Start',
+                          time: start,
+                          onPick: () async {
+                            final t = await showTimePicker(
+                                context: ctx, initialTime: start);
+                            if (t != null) setState(() => start = t);
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          final t = await showTimePicker(
-                              context: ctx, initialTime: end);
-                          if (t != null) setState(() => end = t);
-                        },
-                        child: Text('End: ${end.format(ctx)}'),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _TimePill(
+                          label: 'End',
+                          time: end,
+                          onPick: () async {
+                            final t = await showTimePicker(
+                                context: ctx, initialTime: end);
+                            if (t != null) setState(() => end = t);
+                          },
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  const _SectionLabel('CATEGORY'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final c in tp.categories)
+                        _CategoryChip(
+                          category: c,
+                          selected: c.id == categoryId,
+                          onTap: () => setState(() => categoryId = c.id!),
+                        ),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const CategoriesScreen()),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: Theme.of(ctx)
+                                  .colorScheme
+                                  .outline
+                                  .withOpacity(0.5),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add_rounded, size: 16),
+                              SizedBox(width: 4),
+                              Text('New',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    title: const Text('Daily reminder'),
+                    value: notify,
+                    onChanged: (v) => setState(() => notify = v),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        final title = titleCtrl.text.trim();
+                        if (title.isEmpty) return;
+                        final sM = start.hour * 60 + start.minute;
+                        final eM = end.hour * 60 + end.minute;
+                        if (eM <= sM) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('End must be after start')),
+                          );
+                          return;
+                        }
+                        final block = (existing ??
+                                Block(
+                                  title: '',
+                                  description: '',
+                                  startMinutes: 0,
+                                  endMinutes: 0,
+                                  orderIndex: tp.blocks.length,
+                                  categoryId: categoryId,
+                                ))
+                            .copyWith(
+                          title: title,
+                          description: descCtrl.text.trim(),
+                          startMinutes: sM,
+                          endMinutes: eM,
+                          categoryId: categoryId,
+                          notify: notify,
+                        );
+                        tp.upsertBlock(block);
+                        Navigator.pop(ctx);
+                      },
+                      child: const Text('Save'),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<Priority>(
-                  value: priority,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items: Priority.values
-                      .map((p) => DropdownMenuItem(
-                          value: p, child: Text(p.label)))
-                      .toList(),
-                  onChanged: (p) =>
-                      setState(() => priority = p ?? priority),
-                ),
-                SwitchListTile(
-                  title: const Text('Daily reminder'),
-                  value: notify,
-                  onChanged: (v) => setState(() => notify = v),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                final title = titleCtrl.text.trim();
-                if (title.isEmpty) return;
-                final sM = start.hour * 60 + start.minute;
-                final eM = end.hour * 60 + end.minute;
-                if (eM <= sM) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('End must be after start')),
-                  );
-                  return;
-                }
-                final block = (existing ??
-                        Block(
-                          title: '',
-                          description: '',
-                          startMinutes: 0,
-                          endMinutes: 0,
-                          orderIndex: tp.blocks.length,
-                          priority: Priority.core,
-                        ))
-                    .copyWith(
-                  title: title,
-                  description: descCtrl.text.trim(),
-                  startMinutes: sM,
-                  endMinutes: eM,
-                  priority: priority,
-                  notify: notify,
-                );
-                tp.upsertBlock(block);
-                Navigator.pop(ctx);
-              },
-              child: const Text('Save'),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _deco(String label) => InputDecoration(
+        labelText: label,
+        filled: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      );
+}
+
+class _TimePill extends StatelessWidget {
+  final String label;
+  final TimeOfDay time;
+  final VoidCallback onPick;
+  const _TimePill(
+      {required this.label, required this.time, required this.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onPick,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withOpacity(0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.3,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                )),
+            const SizedBox(height: 4),
+            Text(
+              time.format(context),
+              style: const TextStyle(
+                  fontSize: 17, fontWeight: FontWeight.w700),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _CategoryChip extends StatelessWidget {
+  final AppCategory category;
+  final bool selected;
+  final VoidCallback onTap;
+  const _CategoryChip({
+    required this.category,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          color: selected
+              ? category.color.withOpacity(0.22)
+              : Colors.transparent,
+          border: Border.all(
+            color: selected
+                ? category.color
+                : Theme.of(context).colorScheme.outline.withOpacity(0.4),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(category.icon, color: category.color, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              category.name,
+              style: TextStyle(
+                color: selected
+                    ? category.color
+                    : Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.5,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      );
 }

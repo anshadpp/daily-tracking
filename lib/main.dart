@@ -46,9 +46,9 @@ class DailyTrackerApp extends StatelessWidget {
     return ThemeData(
       colorScheme: cs,
       useMaterial3: true,
-      scaffoldBackgroundColor: cs.surface,
+      scaffoldBackgroundColor: Colors.transparent,
       appBarTheme: AppBarTheme(
-        backgroundColor: cs.surface,
+        backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         foregroundColor: cs.onSurface,
         elevation: 0,

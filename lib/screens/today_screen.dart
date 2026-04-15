@@ -6,8 +6,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/block.dart';
+import '../models/category.dart';
 import '../providers/tracker_provider.dart';
 import '../widgets/block_card.dart';
+import '../widgets/glass.dart';
 
 class TodayScreen extends StatefulWidget {
   const TodayScreen({super.key});
@@ -35,14 +37,15 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   Widget build(BuildContext context) {
     final tp = context.watch<TrackerProvider>();
-    final cs = Theme.of(context).colorScheme;
     final isToday = _sameDay(tp.selectedDate, DateTime.now());
     final current = isToday ? tp.currentBlock : null;
     final next = isToday ? _nextBlock(tp) : null;
+    final cats = tp.categoryById;
 
     return SafeArea(
+      bottom: false,
       child: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.only(top: 8, bottom: 120),
         children: [
           _DateHeader(
             selected: tp.selectedDate,
@@ -56,13 +59,16 @@ class _TodayScreenState extends State<TodayScreen> {
             onTapToday: () => tp.setSelectedDate(DateTime.now()),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: _ProgressHero(
               completed: tp.completedCount,
               total: tp.blocks.length,
               progress: tp.progress,
               current: current,
+              currentCategory:
+                  current != null ? cats[current.categoryId] : null,
               next: next,
+              nextCategory: next != null ? cats[next.categoryId] : null,
             ),
           ),
           if (tp.blocks.isEmpty)
@@ -71,13 +77,15 @@ class _TodayScreenState extends State<TodayScreen> {
               child: Center(
                 child: Text(
                   'No blocks yet. Tap the tune icon to add some.',
-                  style: TextStyle(color: cs.onSurfaceVariant),
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
             ),
           for (final b in tp.blocks)
             BlockCard(
               block: b,
+              category: cats[b.categoryId],
               completed: b.id != null && tp.isCompleted(b.id!),
               isCurrent: current?.id == b.id,
               onToggle: () => tp.toggle(b),
@@ -105,45 +113,49 @@ class _TodayScreenState extends State<TodayScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      backgroundColor: Colors.transparent,
       builder: (_) => Padding(
         padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 8,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          left: 12,
+          right: 12,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 12,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Note — ${b.title}',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              maxLines: 4,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'How did this block go?',
-                filled: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+        child: Glass(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Note — ${b.title}',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                maxLines: 4,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'How did this block go?',
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  tp.setNote(b, ctrl.text);
-                  Navigator.pop(context);
-                },
-                child: const Text('Save'),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    tp.setNote(b, ctrl.text);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Save'),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -171,48 +183,61 @@ class _DateHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       child: Row(
         children: [
-          IconButton.filledTonal(
-            onPressed: onPrev,
-            icon: const Icon(Icons.chevron_left_rounded),
-          ),
+          _GlassIconButton(icon: Icons.chevron_left_rounded, onTap: onPrev),
           Expanded(
             child: InkWell(
+              borderRadius: BorderRadius.circular(14),
               onTap: onTapToday,
-              borderRadius: BorderRadius.circular(12),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Column(
                   children: [
                     Text(
                       isToday ? 'TODAY' : 'JUMP TO TODAY',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 1.5,
+                        letterSpacing: 1.6,
                         color: cs.primary,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      DateFormat('EEE, d MMM').format(selected),
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                      DateFormat('EEEE, d MMM').format(selected),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                          ),
                     ),
                   ],
                 ),
               ),
             ),
           ),
-          IconButton.filledTonal(
-            onPressed: onNext,
-            icon: const Icon(Icons.chevron_right_rounded),
-          ),
+          _GlassIconButton(
+              icon: Icons.chevron_right_rounded, onTap: onNext ?? () {}),
         ],
+      ),
+    );
+  }
+}
+
+class _GlassIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _GlassIconButton({required this.icon, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Glass(
+        borderRadius: BorderRadius.circular(999),
+        padding: const EdgeInsets.all(10),
+        child: Icon(icon, size: 20),
       ),
     );
   }
@@ -223,39 +248,35 @@ class _ProgressHero extends StatelessWidget {
   final int total;
   final double progress;
   final Block? current;
+  final AppCategory? currentCategory;
   final Block? next;
+  final AppCategory? nextCategory;
   const _ProgressHero({
     required this.completed,
     required this.total,
     required this.progress,
     required this.current,
+    required this.currentCategory,
     required this.next,
+    required this.nextCategory,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final highlight = current?.priority.color ?? cs.primary;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            highlight.withOpacity(0.18),
-            cs.surfaceContainerHighest.withOpacity(0.6),
-          ],
-        ),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
-      ),
+    final highlight = currentCategory?.color ??
+        nextCategory?.color ??
+        cs.primary;
+
+    return Glass(
+      borderRadius: BorderRadius.circular(28),
       padding: const EdgeInsets.all(20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 92,
-            height: 92,
+            width: 96,
+            height: 96,
             child: _Ring(
               progress: progress,
               color: highlight,
@@ -264,12 +285,12 @@ class _ProgressHero extends StatelessWidget {
                 children: [
                   Text(
                     '${(progress * 100).round()}%',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                        ),
                   ),
-                  Text('$completed/$total',
+                  Text('$completed / $total',
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
@@ -281,11 +302,13 @@ class _ProgressHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  current != null ? 'NOW' : (next != null ? 'UP NEXT' : 'ALL DONE'),
+                  current != null
+                      ? 'NOW'
+                      : (next != null ? 'UP NEXT' : 'ALL DONE'),
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 1.5,
+                    letterSpacing: 1.6,
                     color: highlight,
                   ),
                 ),
@@ -294,17 +317,17 @@ class _ProgressHero extends StatelessWidget {
                   current?.title ?? next?.title ?? 'Wrap up the day',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   current != null
-                      ? '${current!.rangeLabel} • ends in ${_timeUntil(current!.endMinutes)}'
+                      ? '${current!.rangeLabel}  •  ends in ${_until(current!.endMinutes)}'
                       : next != null
-                          ? '${next!.rangeLabel} • in ${_timeUntil(next!.startMinutes)}'
+                          ? '${next!.rangeLabel}  •  in ${_until(next!.startMinutes)}'
                           : 'Great work today',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
@@ -316,7 +339,7 @@ class _ProgressHero extends StatelessWidget {
     );
   }
 
-  String _timeUntil(int targetMinutes) {
+  String _until(int targetMinutes) {
     final now = DateTime.now();
     final nowMin = now.hour * 60 + now.minute;
     final diff = targetMinutes - nowMin;
@@ -332,7 +355,8 @@ class _Ring extends StatelessWidget {
   final double progress;
   final Color color;
   final Widget child;
-  const _Ring({required this.progress, required this.color, required this.child});
+  const _Ring(
+      {required this.progress, required this.color, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -340,7 +364,7 @@ class _Ring extends StatelessWidget {
       painter: _RingPainter(
         progress: progress,
         color: color,
-        track: Theme.of(context).colorScheme.surfaceContainerHigh,
+        track: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
       child: Center(child: child),
     );
@@ -356,17 +380,17 @@ class _RingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final stroke = 8.0;
+    const stroke = 9.0;
     final rect = Offset(stroke / 2, stroke / 2) &
         Size(size.width - stroke, size.height - stroke);
     final bg = Paint()
-      ..color = track
+      ..color = track.withOpacity(0.6)
       ..strokeWidth = stroke
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     final fg = Paint()
       ..shader = SweepGradient(
-        colors: [color.withOpacity(0.6), color],
+        colors: [color.withOpacity(0.4), color],
         startAngle: -math.pi / 2,
         endAngle: math.pi * 1.5,
       ).createShader(rect)

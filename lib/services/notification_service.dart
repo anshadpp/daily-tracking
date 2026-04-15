@@ -3,7 +3,8 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
-import '../models/block.dart' hide Priority;
+import '../models/block.dart';
+import '../models/category.dart';
 
 class NotificationService {
   NotificationService._();
@@ -19,9 +20,7 @@ class NotificationService {
     try {
       final name = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(name));
-    } catch (_) {
-      // fall back to UTC; scheduling still approx. works
-    }
+    } catch (_) {}
 
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const settings = InitializationSettings(android: android);
@@ -34,7 +33,8 @@ class NotificationService {
     _initialized = true;
   }
 
-  Future<void> rescheduleAll(List<Block> blocks) async {
+  Future<void> rescheduleAll(
+      List<Block> blocks, Map<int, AppCategory> categoriesById) async {
     await init();
     await _plugin.cancelAll();
     final now = tz.TZDateTime.now(tz.local);
@@ -47,6 +47,8 @@ class NotificationService {
       var first =
           tz.TZDateTime(tz.local, now.year, now.month, now.day, h, m);
       if (first.isBefore(now)) first = first.add(const Duration(days: 1));
+
+      final cat = categoriesById[b.categoryId];
 
       final details = NotificationDetails(
         android: AndroidNotificationDetails(
@@ -62,8 +64,8 @@ class NotificationService {
           playSound: true,
           enableVibration: true,
           ticker: b.title,
-          color: b.priority.color,
-          colorized: true,
+          color: cat?.color,
+          colorized: cat != null,
           styleInformation: BigTextStyleInformation(
             '${b.rangeLabel}${b.description.isEmpty ? '' : '\n${b.description}'}',
             contentTitle: b.title,

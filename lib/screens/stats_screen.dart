@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../db/database.dart';
 import '../models/block.dart';
 import '../providers/tracker_provider.dart';
+import '../widgets/glass.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -39,7 +40,9 @@ class _StatsScreenState extends State<StatsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final blocks = context.watch<TrackerProvider>().blocks;
+    final tp = context.watch<TrackerProvider>();
+    final blocks = tp.blocks;
+    final cats = tp.categoryById;
     return FutureBuilder<_StatsBundle>(
       future: _future,
       builder: (ctx, snap) {
@@ -53,90 +56,128 @@ class _StatsScreenState extends State<StatsScreen> {
                 b.daily.length;
         final streak = _streak(b.daily);
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 140),
           children: [
-            _rangeChips(),
+            Wrap(
+              spacing: 8,
+              children: [7, 14, 30].map((d) {
+                final selected = _days == d;
+                return GestureDetector(
+                  onTap: () => _setRange(d),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: selected
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: selected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context)
+                                .colorScheme
+                                .outline
+                                .withOpacity(0.4),
+                      ),
+                    ),
+                    child: Text(
+                      '$d d',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: selected
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
             const SizedBox(height: 16),
-            _summaryRow(avg, streak, b.daily),
+            Row(
+              children: [
+                Expanded(child: _statTile('Avg', '${(avg * 100).round()}%')),
+                const SizedBox(width: 10),
+                Expanded(child: _statTile('Streak', '$streak d')),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _statTile(
+                    'Best',
+                    b.daily.isEmpty
+                        ? '—'
+                        : '${(b.daily.reduce((a, c) => a.pct >= c.pct ? a : c).pct * 100).round()}%',
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 24),
             Text('Daily completion %',
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
-            SizedBox(height: 220, child: _barChart(b.daily)),
-            const SizedBox(height: 28),
+            Glass(
+              borderRadius: BorderRadius.circular(22),
+              padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+              child: SizedBox(height: 220, child: _barChart(b.daily)),
+            ),
+            const SizedBox(height: 24),
             Text('Per-block completion (last $_days days)',
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
-            ..._perBlockList(blocks, b.perBlock),
+            Glass(
+              borderRadius: BorderRadius.circular(22),
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                children: [
+                  for (final block in _sortedBlocks(blocks, b.perBlock))
+                    _perBlockRow(context, block, b.perBlock[block.id] ?? 0,
+                        cats[block.categoryId]?.color),
+                ],
+              ),
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _rangeChips() {
-    return Wrap(
-      spacing: 8,
-      children: [7, 14, 30].map((d) {
-        return ChoiceChip(
-          label: Text('$d d'),
-          selected: _days == d,
-          onSelected: (_) => _setRange(d),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _summaryRow(double avg, int streak, List<DailyStat> daily) {
-    final bestDay = daily.isEmpty
-        ? null
-        : daily.reduce((a, b) => a.pct >= b.pct ? a : b);
-    return Row(
-      children: [
-        Expanded(child: _statTile('Avg', '${(avg * 100).round()}%')),
-        const SizedBox(width: 8),
-        Expanded(child: _statTile('Streak', '$streak d')),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _statTile(
-            'Best',
-            bestDay == null
-                ? '—'
-                : '${(bestDay.pct * 100).round()}%',
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _statTile(String label, String value) {
-    return Container(
+    return Glass(
+      borderRadius: BorderRadius.circular(18),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: Column(
         children: [
           Text(value,
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  )),
           const SizedBox(height: 2),
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          Text(label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  )),
         ],
       ),
     );
   }
 
   Widget _barChart(List<DailyStat> daily) {
+    final cs = Theme.of(context).colorScheme;
     return BarChart(
       BarChartData(
         maxY: 100,
         minY: 0,
         barTouchData: BarTouchData(enabled: true),
-        gridData: const FlGridData(show: true, drawVerticalLine: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (_) => FlLine(
+            color: cs.outline.withOpacity(0.2),
+            strokeWidth: 1,
+          ),
+        ),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
@@ -172,8 +213,13 @@ class _StatsScreenState extends State<StatsScreen> {
             BarChartGroupData(x: i, barRods: [
               BarChartRodData(
                 toY: daily[i].pct * 100,
-                width: 12,
-                borderRadius: BorderRadius.circular(4),
+                width: 10,
+                borderRadius: BorderRadius.circular(6),
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [cs.primary.withOpacity(0.6), cs.primary],
+                ),
               ),
             ]),
         ],
@@ -181,45 +227,49 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  List<Widget> _perBlockList(List<Block> blocks, Map<int, int> counts) {
-    final items = [...blocks]..sort((a, b) =>
-        (counts[b.id] ?? 0).compareTo(counts[a.id] ?? 0));
-    return items.map((b) {
-      final c = counts[b.id] ?? 0;
-      final pct = _days == 0 ? 0.0 : c / _days;
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: b.priority.color,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(child: Text(b.title)),
-              Text('$c / $_days',
-                  style: Theme.of(context).textTheme.bodySmall),
-            ]),
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: pct.clamp(0, 1),
-                minHeight: 6,
-                valueColor:
-                    AlwaysStoppedAnimation(b.priority.color),
-              ),
+  List<Block> _sortedBlocks(List<Block> blocks, Map<int, int> counts) {
+    final list = [...blocks];
+    list.sort((a, b) => (counts[b.id] ?? 0).compareTo(counts[a.id] ?? 0));
+    return list;
+  }
+
+  Widget _perBlockRow(
+      BuildContext context, Block b, int count, Color? color) {
+    final c = color ?? Theme.of(context).colorScheme.primary;
+    final pct = _days == 0 ? 0.0 : count / _days;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: c, shape: BoxShape.circle),
             ),
-          ],
-        ),
-      );
-    }).toList();
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(b.title,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            Text('$count / $_days',
+                style: Theme.of(context).textTheme.bodySmall),
+          ]),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: pct.clamp(0, 1),
+              minHeight: 6,
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation(c),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   int _streak(List<DailyStat> daily) {
