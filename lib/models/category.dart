@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+enum CategoryKind { routine, expense }
+
 class AppCategory {
   final int? id;
   final String name;
   final int colorValue;
   final int iconCodePoint;
   final bool isBuiltIn;
+  final CategoryKind kind;
 
   AppCategory({
     this.id,
@@ -13,6 +16,7 @@ class AppCategory {
     required this.colorValue,
     required this.iconCodePoint,
     this.isBuiltIn = false,
+    this.kind = CategoryKind.routine,
   });
 
   Color get color => Color(colorValue);
@@ -25,6 +29,7 @@ class AppCategory {
         'color_value': colorValue,
         'icon_code_point': iconCodePoint,
         'is_builtin': isBuiltIn ? 1 : 0,
+        'kind': kind.name,
       };
 
   factory AppCategory.fromMap(Map<String, dynamic> m) => AppCategory(
@@ -33,6 +38,10 @@ class AppCategory {
         colorValue: m['color_value'] as int,
         iconCodePoint: m['icon_code_point'] as int,
         isBuiltIn: (m['is_builtin'] as int? ?? 0) == 1,
+        kind: CategoryKind.values.firstWhere(
+          (k) => k.name == (m['kind'] as String? ?? 'routine'),
+          orElse: () => CategoryKind.routine,
+        ),
       );
 
   AppCategory copyWith({
@@ -41,6 +50,7 @@ class AppCategory {
     int? colorValue,
     int? iconCodePoint,
     bool? isBuiltIn,
+    CategoryKind? kind,
   }) =>
       AppCategory(
         id: id ?? this.id,
@@ -48,6 +58,7 @@ class AppCategory {
         colorValue: colorValue ?? this.colorValue,
         iconCodePoint: iconCodePoint ?? this.iconCodePoint,
         isBuiltIn: isBuiltIn ?? this.isBuiltIn,
+        kind: kind ?? this.kind,
       );
 }
 
@@ -113,7 +124,58 @@ class DefaultCategories {
     isBuiltIn: true,
   );
 
-  static List<AppCategory> all() => [
+  // Expense categories
+  static final expFood = AppCategory(
+    name: 'Food',
+    colorValue: 0xFFEF6C00,
+    iconCodePoint: Icons.fastfood_rounded.codePoint,
+    isBuiltIn: true,
+    kind: CategoryKind.expense,
+  );
+  static final expTransport = AppCategory(
+    name: 'Transport',
+    colorValue: 0xFF1565C0,
+    iconCodePoint: Icons.directions_bus_rounded.codePoint,
+    isBuiltIn: true,
+    kind: CategoryKind.expense,
+  );
+  static final expBills = AppCategory(
+    name: 'Bills',
+    colorValue: 0xFFC62828,
+    iconCodePoint: Icons.receipt_long_rounded.codePoint,
+    isBuiltIn: true,
+    kind: CategoryKind.expense,
+  );
+  static final expShopping = AppCategory(
+    name: 'Shopping',
+    colorValue: 0xFF6A1B9A,
+    iconCodePoint: Icons.shopping_bag_rounded.codePoint,
+    isBuiltIn: true,
+    kind: CategoryKind.expense,
+  );
+  static final expHealth = AppCategory(
+    name: 'Health',
+    colorValue: 0xFF00897B,
+    iconCodePoint: Icons.favorite_rounded.codePoint,
+    isBuiltIn: true,
+    kind: CategoryKind.expense,
+  );
+  static final expRent = AppCategory(
+    name: 'Rent',
+    colorValue: 0xFF4E342E,
+    iconCodePoint: Icons.home_rounded.codePoint,
+    isBuiltIn: true,
+    kind: CategoryKind.expense,
+  );
+  static final expOther = AppCategory(
+    name: 'Other',
+    colorValue: 0xFF546E7A,
+    iconCodePoint: Icons.more_horiz_rounded.codePoint,
+    isBuiltIn: true,
+    kind: CategoryKind.expense,
+  );
+
+  static List<AppCategory> allRoutine() => [
         travel360,
         incube,
         rest,
@@ -125,6 +187,19 @@ class DefaultCategories {
         myCompany,
         event,
       ];
+
+  static List<AppCategory> allExpense() => [
+        expFood,
+        expTransport,
+        expBills,
+        expShopping,
+        expHealth,
+        expRent,
+        expOther,
+      ];
+
+  static List<AppCategory> all() =>
+      [...allRoutine(), ...allExpense()];
 }
 
 class CategoryPalette {

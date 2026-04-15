@@ -143,8 +143,9 @@ class EditBlocksScreen extends StatelessWidget {
         : TimeOfDay(
             hour: existing.endMinutes ~/ 60,
             minute: existing.endMinutes % 60);
+    final routineCats = tp.routineCategories;
     int categoryId = existing?.categoryId ??
-        (tp.categories.isNotEmpty ? tp.categories.first.id! : 1);
+        (routineCats.isNotEmpty ? routineCats.first.id! : 1);
     bool notify = existing?.notify ?? true;
     int daysOfWeek = existing?.daysOfWeek ?? DaysOfWeek.all;
     bool isEvent = existing?.specificDate != null;
@@ -219,7 +220,7 @@ class EditBlocksScreen extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      for (final c in tp.categories)
+                      for (final c in routineCats)
                         _CategoryChip(
                           category: c,
                           selected: c.id == categoryId,

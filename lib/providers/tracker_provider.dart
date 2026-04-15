@@ -24,6 +24,10 @@ class TrackerProvider extends ChangeNotifier {
 
   List<Block> get blocks => _blocks;
   List<AppCategory> get categories => _categories;
+  List<AppCategory> get routineCategories =>
+      _categories.where((c) => c.kind == CategoryKind.routine).toList();
+  List<AppCategory> get expenseCategories =>
+      _categories.where((c) => c.kind == CategoryKind.expense).toList();
   List<Holiday> get holidays => _holidays;
   Holiday? get todayHoliday => _todayHoliday;
   Map<int, AppCategory> get categoryById =>

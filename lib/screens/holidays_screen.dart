@@ -74,10 +74,13 @@ class HolidaysScreen extends StatelessWidget {
                 },
               ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addHoliday(context, tp),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add holiday'),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: FloatingActionButton.extended(
+          onPressed: () => _addHoliday(context, tp),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Add holiday'),
+        ),
       ),
     );
   }

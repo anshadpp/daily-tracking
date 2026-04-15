@@ -20,7 +20,7 @@ class AppDatabase {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dbPath, 'daily_tracker.db'),
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -34,7 +34,8 @@ class AppDatabase {
         name TEXT NOT NULL,
         color_value INTEGER NOT NULL,
         icon_code_point INTEGER NOT NULL,
-        is_builtin INTEGER NOT NULL DEFAULT 0
+        is_builtin INTEGER NOT NULL DEFAULT 0,
+        kind TEXT NOT NULL DEFAULT 'routine'
       )
     ''');
     await db.execute('''
@@ -190,6 +191,18 @@ class AppDatabase {
       await db.execute(
           'CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)');
     }
+    if (oldV < 5) {
+      final cols = await db.rawQuery('PRAGMA table_info(categories)');
+      final hasKind = cols.any((c) => c['name'] == 'kind');
+      if (!hasKind) {
+        await db.execute(
+            "ALTER TABLE categories ADD COLUMN kind TEXT NOT NULL DEFAULT 'routine'");
+      }
+      // Insert default expense categories
+      for (final c in DefaultCategories.allExpense()) {
+        await db.insert('categories', c.toMap()..remove('id'));
+      }
+    }
   }
 
   // Categories
@@ -212,11 +225,18 @@ class AppDatabase {
 
   Future<void> deleteCategory(int id) async {
     final db = await database;
+    final rows = await db.query('categories',
+        where: 'id = ?', whereArgs: [id], limit: 1);
+    final kind = rows.isEmpty
+        ? 'routine'
+        : (rows.first['kind'] as String? ?? 'routine');
     final fallback = Sqflite.firstIntValue(await db.rawQuery(
-            'SELECT id FROM categories WHERE id != ? ORDER BY id ASC LIMIT 1',
-            [id])) ??
+            'SELECT id FROM categories WHERE id != ? AND kind = ? ORDER BY id ASC LIMIT 1',
+            [id, kind])) ??
         id;
     await db.update('blocks', {'category_id': fallback},
+        where: 'category_id = ?', whereArgs: [id]);
+    await db.update('expenses', {'category_id': fallback},
         where: 'category_id = ?', whereArgs: [id]);
     await db.delete('categories', where: 'id = ?', whereArgs: [id]);
   }

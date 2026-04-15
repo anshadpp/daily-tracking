@@ -136,10 +136,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _editSheet(context),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add expense'),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 78),
+        child: FloatingActionButton.extended(
+          onPressed: () => _editSheet(context),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Add expense'),
+        ),
       ),
     );
   }
@@ -156,8 +159,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             : (existing.amountCents / 100).toStringAsFixed(
                 existing.amountCents % 100 == 0 ? 0 : 2));
     final noteCtrl = TextEditingController(text: existing?.description ?? '');
+    final expCats = tp.expenseCategories;
     int categoryId = existing?.categoryId ??
-        (tp.categories.isNotEmpty ? tp.categories.first.id! : 1);
+        (expCats.isNotEmpty ? expCats.first.id! : 1);
 
     await showModalBottomSheet(
       context: context,
@@ -230,7 +234,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      for (final c in tp.categories)
+                      for (final c in expCats)
                         _CatChip(
                           category: c,
                           selected: c.id == categoryId,
