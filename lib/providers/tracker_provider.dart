@@ -131,20 +131,43 @@ class TrackerProvider extends ChangeNotifier {
     _pushWidget();
   }
 
+  PrayerInstance? get currentPrayer {
+    if (!AppSettings.I.prayerEnabled) return null;
+    for (final p in prayersForSelectedDate) {
+      if (p.isActiveNow && !p.completed) return p;
+    }
+    return null;
+  }
+
   void _pushWidget() {
     final cur = currentBlock;
     final cat = cur != null ? categoryById[cur.categoryId] : null;
+    final curPrayer = currentPrayer;
     DateTime? nextTime;
     String? nextTitle;
     final active = activeBlocksForSelectedDate;
-    if (cur == null) {
+    final prayers = prayersForSelectedDate;
+
+    if (cur == null && curPrayer == null) {
       final now = DateTime.now();
+      // Check next prayer first
+      for (final p in prayers) {
+        if (p.time.isAfter(now) && !p.completed) {
+          nextTitle = '🕌 ${p.name.label}';
+          nextTime = p.time;
+          break;
+        }
+      }
+      // Check next block, pick whichever is sooner
       final nowMin = now.hour * 60 + now.minute;
       for (final b in active) {
         if (b.startMinutes > nowMin) {
-          nextTitle = b.title;
-          nextTime = DateTime(now.year, now.month, now.day,
+          final bt = DateTime(now.year, now.month, now.day,
               b.startMinutes ~/ 60, b.startMinutes % 60);
+          if (nextTime == null || bt.isBefore(nextTime!)) {
+            nextTitle = b.title;
+            nextTime = bt;
+          }
           break;
         }
       }
@@ -153,7 +176,6 @@ class TrackerProvider extends ChangeNotifier {
     for (final b in active) {
       if (b.id != null && isCompleted(b.id!)) doneIds.add(b.id!);
     }
-    final prayers = prayersForSelectedDate;
     final prayersDone = prayers.where((p) => p.completed).length;
     WidgetService.instance.push(
       completed: completedCount,
@@ -163,6 +185,10 @@ class TrackerProvider extends ChangeNotifier {
       todos: _activeTodos,
       currentBlock: cur,
       currentCategory: cat,
+      currentPrayerLabel: curPrayer != null
+          ? '🕌 ${curPrayer.name.label}'
+          : null,
+      currentPrayerDeadline: curPrayer?.deadlineLabel,
       nextTitle: nextTitle,
       nextTime: nextTime,
       prayers: prayers,

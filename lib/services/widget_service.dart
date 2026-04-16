@@ -37,6 +37,8 @@ class WidgetService {
     required List<Todo> todos,
     Block? currentBlock,
     AppCategory? currentCategory,
+    String? currentPrayerLabel,
+    String? currentPrayerDeadline,
     String? nextTitle,
     DateTime? nextTime,
     List<PrayerInstance> prayers = const [],
@@ -45,16 +47,25 @@ class WidgetService {
     try {
       final pct = total == 0 ? 0 : (100 * completed / total).round();
 
-      await HomeWidget.saveWidgetData<String>(
-          'headline', currentBlock?.title ?? nextTitle ?? 'All caught up');
-      await HomeWidget.saveWidgetData<String>(
-        'subline',
-        currentBlock != null
-            ? '${currentBlock.rangeLabel}  •  NOW'
-            : (nextTime != null
-                ? 'Up next · ${DateFormat('HH:mm').format(nextTime)}'
-                : 'Great work today'),
-      );
+      // Priority: current block > current prayer > next item
+      String headline;
+      String subline;
+      if (currentBlock != null) {
+        headline = currentBlock.title;
+        subline = '${currentBlock.rangeLabel}  •  NOW';
+      } else if (currentPrayerLabel != null) {
+        headline = currentPrayerLabel;
+        subline = 'PRAY NOW  •  Qada at $currentPrayerDeadline';
+      } else if (nextTitle != null && nextTime != null) {
+        headline = nextTitle;
+        subline = 'Up next · ${DateFormat('HH:mm').format(nextTime)}';
+      } else {
+        headline = 'All caught up';
+        subline = 'Great work today';
+      }
+
+      await HomeWidget.saveWidgetData<String>('headline', headline);
+      await HomeWidget.saveWidgetData<String>('subline', subline);
       await HomeWidget.saveWidgetData<int>('progress', pct);
       await HomeWidget.saveWidgetData<String>(
           'progressLabel', '$completed / $total');

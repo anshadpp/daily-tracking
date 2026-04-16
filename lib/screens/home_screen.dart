@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../providers/tracker_provider.dart';
 import '../services/widget_service.dart';
 import '../widgets/glass.dart';
+import '../services/settings_service.dart';
 import 'categories_screen.dart';
 import 'edit_blocks_screen.dart';
 import 'expenses_screen.dart';
@@ -33,10 +34,44 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final initial = await WidgetService.instance.launchedFrom();
       if (initial != null) _handleUri(initial);
+      // Show location picker on first launch
+      if (mounted && AppSettings.I.city == 'Makkah' && _isFirstLaunch()) {
+        _showLocationPicker();
+      }
     });
     _widgetSub = WidgetService.instance.onLaunch.listen((uri) {
       if (uri != null) _handleUri(uri);
     });
+  }
+
+  bool _isFirstLaunch() {
+    // Install date was just set this session if it matches today
+    final today = DateTime.now();
+    final ds =
+        '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    return AppSettings.I.installDate == ds;
+  }
+
+  void _showLocationPicker() {
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _LocationPickerSheet(
+        onSelected: (city) async {
+          AppSettings.I.city = city.name;
+          AppSettings.I.latitude = city.lat;
+          AppSettings.I.longitude = city.lng;
+          await AppSettings.I.save();
+          if (mounted) {
+            await context.read<TrackerProvider>().load();
+            await context.read<TrackerProvider>().rescheduleNotifications();
+          }
+          if (ctx.mounted) Navigator.pop(ctx);
+        },
+      ),
+    );
   }
 
   @override
@@ -268,6 +303,71 @@ class _NavItem extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LocationPickerSheet extends StatelessWidget {
+  final void Function(CommonCity) onSelected;
+  const _LocationPickerSheet({required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      child: Glass(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurfaceVariant.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Icon(Icons.mosque_rounded, color: cs.primary, size: 32),
+            const SizedBox(height: 8),
+            Text('Select your location',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
+                    )),
+            const SizedBox(height: 4),
+            Text(
+              'This sets accurate prayer times for your area. You can change it later in Settings.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: CommonCity.all.map((c) {
+                    return ActionChip(
+                      label: Text(c.name),
+                      avatar: const Icon(Icons.location_on_outlined, size: 16),
+                      onPressed: () => onSelected(c),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
           ],
         ),
       ),

@@ -706,21 +706,37 @@ class AppDatabase {
         0;
   }
 
-  /// Prayer completion map for a month: date → {prayer: completed}
-  Future<Map<String, Map<String, bool>>> getPrayerCalendar(
+  /// Prayer calendar: date → {prayer: status}
+  /// Status: 'done' = completed on time, 'missed' = not done, 'madeup' = qada made up
+  Future<Map<String, Map<String, String>>> getPrayerCalendar(
       int year, int month) async {
     final db = await database;
     final prefix =
         '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
+    // Prayer completions
     final rows = await db.rawQuery(
         "SELECT date, prayer, completed FROM prayer_completions WHERE date LIKE '$prefix-%'");
-    final result = <String, Map<String, bool>>{};
+    final result = <String, Map<String, String>>{};
     for (final r in rows) {
       final d = r['date'] as String;
       final p = r['prayer'] as String;
       final c = (r['completed'] as int) == 1;
       result.putIfAbsent(d, () => {});
-      result[d]![p] = c;
+      result[d]![p] = c ? 'done' : 'missed';
+    }
+    // Overlay Qada made-up status
+    final qadaRows = await db.rawQuery(
+        "SELECT missed_date, prayer, made_up FROM qada WHERE missed_date LIKE '$prefix-%'");
+    for (final r in qadaRows) {
+      final d = r['missed_date'] as String;
+      final p = r['prayer'] as String;
+      final madeUp = (r['made_up'] as int) == 1;
+      result.putIfAbsent(d, () => {});
+      if (madeUp && result[d]![p] != 'done') {
+        result[d]![p] = 'madeup';
+      } else if (!madeUp && result[d]?[p] == null) {
+        result[d]![p] = 'missed';
+      }
     }
     return result;
   }

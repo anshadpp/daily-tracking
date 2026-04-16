@@ -202,7 +202,7 @@ class _QadaScreenState extends State<QadaScreen> {
 }
 
 class _QadaBundle {
-  final Map<String, Map<String, bool>> calendar;
+  final Map<String, Map<String, String>> calendar; // date → {prayer: status}
   final Map<String, int> stats;
   _QadaBundle({required this.calendar, required this.stats});
 }
@@ -343,7 +343,7 @@ class _PrayerMiniStat extends StatelessWidget {
 
 class _PrayerCalendar extends StatelessWidget {
   final DateTime month;
-  final Map<String, Map<String, bool>> data;
+  final Map<String, Map<String, String>> data;
   final VoidCallback onPrev;
   final VoidCallback onNext;
   const _PrayerCalendar({
@@ -443,9 +443,11 @@ class _PrayerCalendar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _LegendDot(color: const Color(0xFF2E7D32), label: 'Done'),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
+              _LegendDot(color: Colors.orange, label: 'Made up'),
+              const SizedBox(width: 10),
               _LegendDot(color: Colors.red, label: 'Missed'),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               _LegendDot(
                   color: Colors.grey.withOpacity(0.4), label: 'No data'),
             ],
@@ -463,7 +465,7 @@ class _PrayerCalendar extends StatelessWidget {
 
 class _CalendarCell extends StatelessWidget {
   final int day;
-  final Map<String, bool>? prayers;
+  final Map<String, String>? prayers; // prayer → 'done'|'missed'|'madeup'
   final bool isToday;
   final bool isFuture;
   const _CalendarCell({
@@ -478,19 +480,26 @@ class _CalendarCell extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     const prayerKeys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
     final hasPrayers = prayers != null && prayers!.isNotEmpty;
-    final done =
-        hasPrayers ? prayers!.values.where((v) => v).length : 0;
-    final total = hasPrayers ? prayers!.length : 0;
+    final doneCount = hasPrayers
+        ? prayers!.values
+            .where((v) => v == 'done' || v == 'madeup')
+            .length
+        : 0;
+    final onTimeCount = hasPrayers
+        ? prayers!.values.where((v) => v == 'done').length
+        : 0;
 
     Color bgColor;
     if (isFuture) {
       bgColor = Colors.transparent;
     } else if (!hasPrayers) {
       bgColor = cs.surfaceContainerHighest.withOpacity(0.3);
-    } else if (done == 5) {
+    } else if (onTimeCount == 5) {
       bgColor = const Color(0xFF2E7D32).withOpacity(0.18);
-    } else if (done > 0) {
-      bgColor = Colors.orange.withOpacity(0.15);
+    } else if (doneCount == 5) {
+      bgColor = Colors.orange.withOpacity(0.12); // all done via qada
+    } else if (doneCount > 0) {
+      bgColor = Colors.orange.withOpacity(0.10);
     } else {
       bgColor = Colors.red.withOpacity(0.12);
     }
@@ -523,19 +532,20 @@ class _CalendarCell extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: prayerKeys.map((p) {
-                final c = prayers?[p];
+                final s = prayers?[p];
+                final color = s == null
+                    ? Colors.grey.withOpacity(0.3)
+                    : s == 'done'
+                        ? const Color(0xFF2E7D32)
+                        : s == 'madeup'
+                            ? Colors.orange
+                            : Colors.red;
                 return Container(
                   width: 5,
                   height: 5,
                   margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: c == null
-                        ? Colors.grey.withOpacity(0.3)
-                        : c
-                            ? const Color(0xFF2E7D32)
-                            : Colors.red,
-                  ),
+                  decoration:
+                      BoxDecoration(shape: BoxShape.circle, color: color),
                 );
               }).toList(),
             ),

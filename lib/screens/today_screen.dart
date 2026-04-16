@@ -47,9 +47,20 @@ class _TodayScreenState extends State<TodayScreen> {
     final activeBlocks = tp.activeBlocksForSelectedDate;
     final skippedBlocks = tp.skippedBlocksForSelectedDate;
     final prayers = tp.prayersForSelectedDate;
-    final next = isToday ? _nextItem(activeBlocks, prayers) : null;
     final cats = tp.categoryById;
     final holiday = tp.todayHoliday;
+
+    // Find current active prayer (started, not past deadline, not done)
+    PrayerInstance? currentPrayer;
+    if (isToday) {
+      for (final p in prayers) {
+        if (p.isActiveNow && !p.completed) {
+          currentPrayer = p;
+          break;
+        }
+      }
+    }
+    final next = isToday ? _nextItem(activeBlocks, prayers) : null;
 
     return SafeArea(
       bottom: false,
@@ -107,6 +118,7 @@ class _TodayScreenState extends State<TodayScreen> {
               currentBlock: current,
               currentCategory:
                   current != null ? cats[current.categoryId] : null,
+              currentPrayer: currentPrayer,
               nextLabel: next?.$1,
               nextTime: next?.$2,
               nextColor: next?.$3,
@@ -779,6 +791,7 @@ class _ProgressHero extends StatelessWidget {
   final double progress;
   final Block? currentBlock;
   final AppCategory? currentCategory;
+  final PrayerInstance? currentPrayer;
   final String? nextLabel;
   final DateTime? nextTime;
   final Color? nextColor;
@@ -788,6 +801,7 @@ class _ProgressHero extends StatelessWidget {
     required this.progress,
     required this.currentBlock,
     required this.currentCategory,
+    this.currentPrayer,
     required this.nextLabel,
     required this.nextTime,
     required this.nextColor,
@@ -796,21 +810,38 @@ class _ProgressHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final highlight =
-        currentCategory?.color ?? nextColor ?? cs.primary;
+    const prayerColor = Color(0xFF00695C);
 
-    final title = currentBlock?.title ?? nextLabel ?? 'Wrap up the day';
-    final status =
-        currentBlock != null ? 'NOW' : (nextLabel != null ? 'UP NEXT' : 'ALL DONE');
+    // Priority: currentBlock > currentPrayer > next > all done
+    final hasCurrent = currentBlock != null || currentPrayer != null;
+    final highlight = currentBlock != null
+        ? (currentCategory?.color ?? cs.primary)
+        : currentPrayer != null
+            ? prayerColor
+            : (nextColor ?? cs.primary);
+
+    String title;
+    String status;
     String sub;
     if (currentBlock != null) {
+      title = currentBlock!.title;
+      status = 'NOW';
       sub =
           '${currentBlock!.rangeLabel}  •  ends in ${_untilMin(currentBlock!.endMinutes)}';
-    } else if (nextTime != null) {
+    } else if (currentPrayer != null) {
+      title = '🕌 ${currentPrayer!.name.label}';
+      status = 'PRAY NOW';
+      sub =
+          '${currentPrayer!.timeLabel} – ${currentPrayer!.deadlineLabel}  •  ${currentPrayer!.minutesUntilQada} min before Qada';
+    } else if (nextLabel != null && nextTime != null) {
+      title = nextLabel!;
+      status = 'UP NEXT';
       final diff = nextTime!.difference(DateTime.now());
       sub =
           '${DateFormat('HH:mm').format(nextTime!)}  •  in ${_untilDuration(diff)}';
     } else {
+      title = 'Wrap up the day';
+      status = 'ALL DONE';
       sub = 'Great work today';
     }
 
