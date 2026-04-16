@@ -56,11 +56,12 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
             val data = HomeWidgetPlugin.getData(context)
 
             var headline = data.getString("headline", "Daily Tracker") ?: "Daily Tracker"
-            var subline = data.getString("subline", "Tap to open") ?: "Tap to open"
+            var subline = data.getString("subline", "") ?: ""
             var progress = data.getInt("progress", 0)
             var progressLabel = data.getString("progressLabel", "0 / 0") ?: "0 / 0"
-            val prayers = data.getString("prayers", "") ?: ""
             val todosStr = data.getString("todos", "[]") ?: "[]"
+            val prayersStr = data.getString("prayersJson", "[]") ?: "[]"
+            val qadaStr = data.getString("qada", "") ?: ""
 
             // Self-compute from schedule JSON
             val scheduleStr = data.getString("schedule", null)
@@ -121,21 +122,7 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_progress_label, "$progress%  •  $progressLabel")
             views.setProgressBar(R.id.widget_progress, 100, progress, false)
 
-            // Prayers
-            if (prayers.isNotEmpty()) {
-                val parts = prayers.split(";").take(3)
-                val labels = parts.map { seg ->
-                    val kv = seg.split("|")
-                    "${kv.getOrNull(0) ?: ""} ${kv.getOrNull(1) ?: ""}".trim()
-                }
-                views.setTextViewText(R.id.widget_prayers, labels.joinToString("  •  "))
-                views.setViewVisibility(R.id.widget_prayers, android.view.View.VISIBLE)
-            } else {
-                views.setViewVisibility(R.id.widget_prayers, android.view.View.GONE)
-            }
-
             // Qada warning
-            val qadaStr = data.getString("qada", "") ?: ""
             if (qadaStr.isNotEmpty()) {
                 views.setTextViewText(R.id.widget_qada, "⚠ Qada: $qadaStr")
                 views.setViewVisibility(R.id.widget_qada, android.view.View.VISIBLE)
@@ -143,29 +130,90 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_qada, android.view.View.GONE)
             }
 
-            // Todos
+            // Prayers — 5 slots with checkboxes
+            val prayerRowIds = intArrayOf(
+                R.id.widget_prayer1_row, R.id.widget_prayer2_row,
+                R.id.widget_prayer3_row, R.id.widget_prayer4_row,
+                R.id.widget_prayer5_row
+            )
+            val prayerCheckIds = intArrayOf(
+                R.id.widget_prayer1_check, R.id.widget_prayer2_check,
+                R.id.widget_prayer3_check, R.id.widget_prayer4_check,
+                R.id.widget_prayer5_check
+            )
+            val prayerTextIds = intArrayOf(
+                R.id.widget_prayer1_text, R.id.widget_prayer2_text,
+                R.id.widget_prayer3_text, R.id.widget_prayer4_text,
+                R.id.widget_prayer5_text
+            )
+            try {
+                val prayersArr = JSONArray(prayersStr)
+                if (prayersArr.length() > 0) {
+                    views.setViewVisibility(R.id.widget_prayer_section, android.view.View.VISIBLE)
+                    for (i in 0 until 5) {
+                        if (i < prayersArr.length()) {
+                            val p = prayersArr.getJSONObject(i)
+                            val key = p.getString("key")
+                            val label = p.getString("label")
+                            val time = p.getString("time")
+                            val completed = p.getBoolean("completed")
+                            val isQada = p.optBoolean("isQada", false)
+
+                            views.setViewVisibility(prayerRowIds[i], android.view.View.VISIBLE)
+                            val display = if (completed) "✓ $label  $time"
+                                else if (isQada) "✗ $label  $time  QADA"
+                                else "$label  $time"
+                            views.setTextViewText(prayerTextIds[i], display)
+                            views.setInt(prayerTextIds[i], "setTextColor",
+                                if (completed) 0xFF81C784.toInt()
+                                else if (isQada) 0xFFEF5350.toInt()
+                                else 0xDDFFFFFF.toInt()
+                            )
+                            // Checkbox icon
+                            views.setImageViewResource(prayerCheckIds[i],
+                                if (completed) android.R.drawable.checkbox_on_background
+                                else android.R.drawable.checkbox_off_background
+                            )
+                            // Background toggle — no app open
+                            val toggleIntent = HomeWidgetBackgroundIntent.getBroadcast(
+                                context,
+                                Uri.parse("dailytracker://toggle-prayer/$key")
+                            )
+                            views.setOnClickPendingIntent(prayerCheckIds[i], toggleIntent)
+                            views.setOnClickPendingIntent(prayerRowIds[i], toggleIntent)
+                        } else {
+                            views.setViewVisibility(prayerRowIds[i], android.view.View.GONE)
+                        }
+                    }
+                } else {
+                    views.setViewVisibility(R.id.widget_prayer_section, android.view.View.GONE)
+                }
+            } catch (_: Exception) {
+                views.setViewVisibility(R.id.widget_prayer_section, android.view.View.GONE)
+            }
+
+            // Todos — 3 slots with checkboxes
+            val todoRowIds = intArrayOf(R.id.widget_todo1_row, R.id.widget_todo2_row, R.id.widget_todo3_row)
+            val todoCheckIds = intArrayOf(R.id.widget_todo1_check, R.id.widget_todo2_check, R.id.widget_todo3_check)
+            val todoTextIds = intArrayOf(R.id.widget_todo1_text, R.id.widget_todo2_text, R.id.widget_todo3_text)
             try {
                 val todosArr = JSONArray(todosStr)
                 if (todosArr.length() > 0) {
                     views.setViewVisibility(R.id.widget_todo_section, android.view.View.VISIBLE)
-                    val rowIds = intArrayOf(R.id.widget_todo1_row, R.id.widget_todo2_row, R.id.widget_todo3_row)
-                    val checkIds = intArrayOf(R.id.widget_todo1_check, R.id.widget_todo2_check, R.id.widget_todo3_check)
-                    val textIds = intArrayOf(R.id.widget_todo1_text, R.id.widget_todo2_text, R.id.widget_todo3_text)
                     for (i in 0 until 3) {
                         if (i < todosArr.length()) {
                             val todo = todosArr.getJSONObject(i)
                             val todoId = todo.getInt("id")
                             val title = todo.getString("title")
-                            views.setViewVisibility(rowIds[i], android.view.View.VISIBLE)
-                            views.setTextViewText(textIds[i], title)
-                            // Background intent to toggle todo — does NOT open app
+                            views.setViewVisibility(todoRowIds[i], android.view.View.VISIBLE)
+                            views.setTextViewText(todoTextIds[i], title)
                             val toggleIntent = HomeWidgetBackgroundIntent.getBroadcast(
                                 context,
                                 Uri.parse("dailytracker://toggle-todo/$todoId")
                             )
-                            views.setOnClickPendingIntent(checkIds[i], toggleIntent)
+                            views.setOnClickPendingIntent(todoCheckIds[i], toggleIntent)
                         } else {
-                            views.setViewVisibility(rowIds[i], android.view.View.GONE)
+                            views.setViewVisibility(todoRowIds[i], android.view.View.GONE)
                         }
                     }
                 } else {
@@ -175,21 +223,21 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_todo_section, android.view.View.GONE)
             }
 
-            // ONLY the app name opens the app
+            // ONLY app name opens the app
             val openAppIntent = HomeWidgetLaunchIntent.getActivity(
                 context, MainActivity::class.java, Uri.parse("dailytracker://open")
             )
             views.setOnClickPendingIntent(R.id.widget_app_name, openAppIntent)
 
-            // Mark current block done — background, no app open
+            // Mark current block done — background
             val toggleBlockIntent = HomeWidgetBackgroundIntent.getBroadcast(
                 context, Uri.parse("dailytracker://toggle-current")
             )
             views.setOnClickPendingIntent(R.id.widget_done_btn, toggleBlockIntent)
 
-            // Refresh — opens app to sync latest data
-            val refreshIntent = HomeWidgetLaunchIntent.getActivity(
-                context, MainActivity::class.java, Uri.parse("dailytracker://refresh")
+            // Refresh — background (no app open)
+            val refreshIntent = HomeWidgetBackgroundIntent.getBroadcast(
+                context, Uri.parse("dailytracker://refresh")
             )
             views.setOnClickPendingIntent(R.id.widget_refresh_btn, refreshIntent)
 

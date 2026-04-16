@@ -81,16 +81,20 @@ class WidgetService {
       );
       await HomeWidget.saveWidgetData<String>('todos', todosJson);
 
-      final now = DateTime.now();
-      final upcoming =
-          prayers.where((p) => p.time.isAfter(now)).take(3).toList();
-      await HomeWidget.saveWidgetData<String>(
-        'prayers',
-        upcoming
-            .map((p) =>
-                '${p.name.label}|${DateFormat('HH:mm').format(p.time)}')
-            .join(';'),
+      // All 5 prayers with completion status + name key for toggle
+      final prayersJson = jsonEncode(
+        prayers
+            .map((p) => {
+                  'key': p.name.key,
+                  'label': p.name.label,
+                  'time': DateFormat('HH:mm').format(p.time),
+                  'deadline': p.deadlineLabel,
+                  'completed': p.completed,
+                  'isQada': p.isQadaNow,
+                })
+            .toList(),
       );
+      await HomeWidget.saveWidgetData<String>('prayersJson', prayersJson);
 
       // Qada status: prayers whose window passed and not completed
       final qadaNow = prayers
@@ -160,6 +164,66 @@ Future<void> widgetBackgroundCallback(Uri? uri) async {
       );
       await HomeWidget.saveWidgetData<String>('todos', todosJson);
       await db.close();
+      await HomeWidget.updateWidget(
+        qualifiedAndroidName:
+            'com.example.daily_tracker.DailyTrackerWidgetProvider',
+      );
+    } else if (uri.host == 'toggle-prayer') {
+      final prayerKey = uri.pathSegments.firstOrNull;
+      if (prayerKey == null) return;
+      final dbPath = await getDatabasesPath();
+      final db = await openDatabase(p.join(dbPath, 'daily_tracker.db'));
+      final now = DateTime.now();
+      final nowMin = now.hour * 60 + now.minute;
+      final dateStr =
+          '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final existing = await db.query('prayer_completions',
+          where: 'date = ? AND prayer = ?',
+          whereArgs: [dateStr, prayerKey]);
+      if (existing.isEmpty) {
+        await db.insert('prayer_completions', {
+          'date': dateStr,
+          'prayer': prayerKey,
+          'completed': 1,
+          'completed_at_minutes': nowMin,
+        });
+      } else {
+        final cur = (existing.first['completed'] as int) == 1;
+        await db.update(
+          'prayer_completions',
+          {'completed': cur ? 0 : 1, 'completed_at_minutes': nowMin},
+          where: 'date = ? AND prayer = ?',
+          whereArgs: [dateStr, prayerKey],
+        );
+      }
+      // Re-read and update widget prayer data
+      final allPC = await db.query('prayer_completions',
+          where: 'date = ?', whereArgs: [dateStr]);
+      final doneSet = <String>{};
+      for (final r in allPC) {
+        if ((r['completed'] as int) == 1) {
+          doneSet.add(r['prayer'] as String);
+        }
+      }
+      // Re-read existing prayersJson and update completed flags
+      final oldJson = await HomeWidget.getWidgetData<String>('prayersJson');
+      if (oldJson != null) {
+        final list = jsonDecode(oldJson) as List;
+        final updated = list.map((item) {
+          final m = Map<String, dynamic>.from(item as Map);
+          m['completed'] = doneSet.contains(m['key']);
+          return m;
+        }).toList();
+        await HomeWidget.saveWidgetData<String>(
+            'prayersJson', jsonEncode(updated));
+      }
+      await db.close();
+      await HomeWidget.updateWidget(
+        qualifiedAndroidName:
+            'com.example.daily_tracker.DailyTrackerWidgetProvider',
+      );
+    } else if (uri.host == 'refresh') {
+      // Just trigger a widget redraw with existing data
       await HomeWidget.updateWidget(
         qualifiedAndroidName:
             'com.example.daily_tracker.DailyTrackerWidgetProvider',
