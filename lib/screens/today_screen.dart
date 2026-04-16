@@ -1104,77 +1104,80 @@ class _QadaBanner extends StatelessWidget {
     for (final q in qadaList) {
       grouped.putIfAbsent(q.missedDate, () => []).add(q);
     }
+    // Show only first 3 dates
+    final entries = grouped.entries.toList();
+    final shown = entries.take(3).toList();
+    final remaining = entries.length - shown.length;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       child: Glass(
         borderRadius: BorderRadius.circular(22),
-        padding: const EdgeInsets.all(16),
-        tint: Colors.red.withOpacity(0.08),
+        padding: const EdgeInsets.all(14),
+        tint: Colors.red.withOpacity(0.06),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.warning_rounded,
-                    color: Colors.red.shade400, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Qada — Missed prayers (${qadaList.length})',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: Colors.red.shade400,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'These prayers were not marked. Make them up as Qada.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 10),
-            for (final entry in grouped.entries) ...[
+            for (final entry in shown) ...[
               Text(
                 entry.key,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Wrap(
-                spacing: 8,
-                runSpacing: 6,
+                spacing: 6,
+                runSpacing: 4,
                 children: entry.value.map((q) {
-                  return ActionChip(
-                    label: Text(q.prayerLabel),
-                    avatar: const Icon(Icons.mosque_rounded, size: 16),
-                    onPressed: () => onMarkDone(q),
+                  return GestureDetector(
+                    onTap: () => onMarkDone(q),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.red.withOpacity(0.10),
+                        border: Border.all(
+                            color: Colors.red.withOpacity(0.25)),
+                      ),
+                      child: Text(
+                        q.prayerLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.red.shade400,
+                        ),
+                      ),
+                    ),
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
             ],
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    'Tap a prayer to mark its Qada as made up.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontStyle: FontStyle.italic,
-                        ),
+                if (remaining > 0)
+                  Text(
+                    '+$remaining more days',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.red.shade300,
+                    ),
                   ),
-                ),
+                const Spacer(),
                 if (onTapExpand != null)
                   TextButton.icon(
                     onPressed: onTapExpand,
-                    icon: const Icon(Icons.calendar_month_rounded, size: 16),
-                    label: const Text('Calendar'),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                    label: const Text('Full list'),
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.red.shade400,
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
                     ),
                   ),
               ],

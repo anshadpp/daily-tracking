@@ -4,10 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="14dp"
+    android:padding="12dp"
     android:background="@drawable/widget_background">
 
-    <!-- Header: title (opens app) + refresh (background) -->
+    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -22,28 +22,24 @@
             android:text="Daily Tracker"
             android:textSize="11sp"
             android:textStyle="bold"
-            android:textColor="#99FFFFFF"
-            android:maxLines="1"
-            android:letterSpacing="0.1" />
+            android:textColor="#99FFFFFF" />
 
         <ImageButton
             android:id="@+id/widget_refresh_btn"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:padding="4dp"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:background="@android:color/transparent"
             android:src="@android:drawable/ic_popup_sync"
             android:contentDescription="Refresh" />
     </LinearLayout>
 
-    <!-- Current/next block -->
     <TextView
         android:id="@+id/widget_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:text="All caught up"
-        android:textSize="16sp"
+        android:textSize="15sp"
         android:textStyle="bold"
         android:textColor="#FFFFFFFF"
         android:maxLines="1"
@@ -53,19 +49,17 @@
         android:id="@+id/widget_subtitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:text=""
-        android:textSize="11sp"
-        android:textColor="#BBFFFFFF"
+        android:layout_marginTop="1dp"
+        android:textSize="10sp"
+        android:textColor="#AAFFFFFF"
         android:maxLines="1"
         android:ellipsize="end" />
 
-    <!-- Progress -->
     <ProgressBar
         android:id="@+id/widget_progress"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="6dp"
+        android:layout_height="4dp"
         android:layout_marginTop="8dp"
         android:max="100"
         android:progress="0" />
@@ -74,111 +68,68 @@
         android:id="@+id/widget_progress_label"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:text="0%  •  0 / 0"
-        android:textSize="10sp"
-        android:textColor="#99FFFFFF" />
+        android:layout_marginTop="2dp"
+        android:textSize="9sp"
+        android:textColor="#88FFFFFF" />
 
-    <!-- Qada warning -->
     <TextView
         android:id="@+id/widget_qada"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text=""
-        android:textSize="10sp"
+        android:textSize="9sp"
         android:textColor="#FFEF5350"
         android:textStyle="bold"
         android:maxLines="1"
-        android:ellipsize="end"
         android:visibility="gone" />
 
-    <!-- Prayers (5 slots, tappable checkboxes) -->
-    <LinearLayout
-        android:id="@+id/widget_prayer_section"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="6dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="PRAYERS"
-            android:textSize="9sp"
-            android:textStyle="bold"
-            android:textColor="#77FFFFFF"
-            android:letterSpacing="0.15" />
-
-        <LinearLayout android:id="@+id/widget_prayer1_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="3dp" android:visibility="gone">
-            <ImageButton android:id="@+id/widget_prayer1_check" android:layout_width="22dp" android:layout_height="22dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
-            <TextView android:id="@+id/widget_prayer1_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textSize="11sp" android:textColor="#DDFFFFFF" android:maxLines="1" android:ellipsize="end" />
+    <!-- Prayers -->
+    <LinearLayout android:id="@+id/widget_prayer_section" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="4dp" android:visibility="gone">
+        <LinearLayout android:id="@+id/widget_prayer1_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp" android:visibility="gone">
+            <ImageButton android:id="@+id/widget_prayer1_check" android:layout_width="20dp" android:layout_height="20dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
+            <TextView android:id="@+id/widget_prayer1_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:textSize="10sp" android:textColor="#DDFFFFFF" android:maxLines="1" />
         </LinearLayout>
-
-        <LinearLayout android:id="@+id/widget_prayer2_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp" android:visibility="gone">
-            <ImageButton android:id="@+id/widget_prayer2_check" android:layout_width="22dp" android:layout_height="22dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
-            <TextView android:id="@+id/widget_prayer2_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textSize="11sp" android:textColor="#DDFFFFFF" android:maxLines="1" android:ellipsize="end" />
+        <LinearLayout android:id="@+id/widget_prayer2_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="1dp" android:visibility="gone">
+            <ImageButton android:id="@+id/widget_prayer2_check" android:layout_width="20dp" android:layout_height="20dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
+            <TextView android:id="@+id/widget_prayer2_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:textSize="10sp" android:textColor="#DDFFFFFF" android:maxLines="1" />
         </LinearLayout>
-
-        <LinearLayout android:id="@+id/widget_prayer3_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp" android:visibility="gone">
-            <ImageButton android:id="@+id/widget_prayer3_check" android:layout_width="22dp" android:layout_height="22dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
-            <TextView android:id="@+id/widget_prayer3_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textSize="11sp" android:textColor="#DDFFFFFF" android:maxLines="1" android:ellipsize="end" />
+        <LinearLayout android:id="@+id/widget_prayer3_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="1dp" android:visibility="gone">
+            <ImageButton android:id="@+id/widget_prayer3_check" android:layout_width="20dp" android:layout_height="20dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
+            <TextView android:id="@+id/widget_prayer3_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:textSize="10sp" android:textColor="#DDFFFFFF" android:maxLines="1" />
         </LinearLayout>
-
-        <LinearLayout android:id="@+id/widget_prayer4_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp" android:visibility="gone">
-            <ImageButton android:id="@+id/widget_prayer4_check" android:layout_width="22dp" android:layout_height="22dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
-            <TextView android:id="@+id/widget_prayer4_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textSize="11sp" android:textColor="#DDFFFFFF" android:maxLines="1" android:ellipsize="end" />
+        <LinearLayout android:id="@+id/widget_prayer4_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="1dp" android:visibility="gone">
+            <ImageButton android:id="@+id/widget_prayer4_check" android:layout_width="20dp" android:layout_height="20dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
+            <TextView android:id="@+id/widget_prayer4_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:textSize="10sp" android:textColor="#DDFFFFFF" android:maxLines="1" />
         </LinearLayout>
-
-        <LinearLayout android:id="@+id/widget_prayer5_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp" android:visibility="gone">
-            <ImageButton android:id="@+id/widget_prayer5_check" android:layout_width="22dp" android:layout_height="22dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
-            <TextView android:id="@+id/widget_prayer5_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textSize="11sp" android:textColor="#DDFFFFFF" android:maxLines="1" android:ellipsize="end" />
+        <LinearLayout android:id="@+id/widget_prayer5_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="1dp" android:visibility="gone">
+            <ImageButton android:id="@+id/widget_prayer5_check" android:layout_width="20dp" android:layout_height="20dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
+            <TextView android:id="@+id/widget_prayer5_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:textSize="10sp" android:textColor="#DDFFFFFF" android:maxLines="1" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Todos (3 slots) -->
-    <LinearLayout
-        android:id="@+id/widget_todo_section"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="6dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="TODOS"
-            android:textSize="9sp"
-            android:textStyle="bold"
-            android:textColor="#77FFFFFF"
-            android:letterSpacing="0.15" />
-
-        <LinearLayout android:id="@+id/widget_todo1_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="3dp" android:visibility="gone">
-            <ImageButton android:id="@+id/widget_todo1_check" android:layout_width="22dp" android:layout_height="22dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
-            <TextView android:id="@+id/widget_todo1_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textSize="11sp" android:textColor="#DDFFFFFF" android:maxLines="1" android:ellipsize="end" />
+    <!-- Todos -->
+    <LinearLayout android:id="@+id/widget_todo_section" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="4dp" android:visibility="gone">
+        <LinearLayout android:id="@+id/widget_todo1_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp" android:visibility="gone">
+            <ImageButton android:id="@+id/widget_todo1_check" android:layout_width="20dp" android:layout_height="20dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
+            <TextView android:id="@+id/widget_todo1_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:textSize="10sp" android:textColor="#DDFFFFFF" android:maxLines="1" />
         </LinearLayout>
-
-        <LinearLayout android:id="@+id/widget_todo2_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp" android:visibility="gone">
-            <ImageButton android:id="@+id/widget_todo2_check" android:layout_width="22dp" android:layout_height="22dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
-            <TextView android:id="@+id/widget_todo2_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textSize="11sp" android:textColor="#DDFFFFFF" android:maxLines="1" android:ellipsize="end" />
+        <LinearLayout android:id="@+id/widget_todo2_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="1dp" android:visibility="gone">
+            <ImageButton android:id="@+id/widget_todo2_check" android:layout_width="20dp" android:layout_height="20dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
+            <TextView android:id="@+id/widget_todo2_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:textSize="10sp" android:textColor="#DDFFFFFF" android:maxLines="1" />
         </LinearLayout>
-
-        <LinearLayout android:id="@+id/widget_todo3_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp" android:visibility="gone">
-            <ImageButton android:id="@+id/widget_todo3_check" android:layout_width="22dp" android:layout_height="22dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
-            <TextView android:id="@+id/widget_todo3_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textSize="11sp" android:textColor="#DDFFFFFF" android:maxLines="1" android:ellipsize="end" />
+        <LinearLayout android:id="@+id/widget_todo3_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="1dp" android:visibility="gone">
+            <ImageButton android:id="@+id/widget_todo3_check" android:layout_width="20dp" android:layout_height="20dp" android:background="@android:color/transparent" android:src="@android:drawable/checkbox_off_background" android:contentDescription="Toggle" />
+            <TextView android:id="@+id/widget_todo3_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:textSize="10sp" android:textColor="#DDFFFFFF" android:maxLines="1" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Mark current block done -->
     <Button
         android:id="@+id/widget_done_btn"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="✓ Mark current done"
-        android:textSize="11sp"
+        android:layout_height="32dp"
+        android:layout_marginTop="4dp"
+        android:text="✓ Done"
+        android:textSize="10sp"
         android:textColor="#FFFFFFFF"
         android:background="@drawable/widget_button_bg"
         android:stateListAnimator="@null" />

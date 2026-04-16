@@ -14,7 +14,7 @@ class Glass extends StatelessWidget {
   const Glass({
     super.key,
     required this.child,
-    this.blur = 12,  // reduced from 22 for better performance
+    this.blur = 8,
     this.opacity = 0.55,
     this.borderRadius = const BorderRadius.all(Radius.circular(22)),
     this.tint,
@@ -30,38 +30,31 @@ class Glass extends StatelessWidget {
             ? Colors.white.withOpacity(0.06)
             : Colors.white.withOpacity(0.55));
     final borderColor = brightness == Brightness.dark
-        ? Colors.white.withOpacity(0.12)
-        : Colors.white.withOpacity(0.6);
+        ? Colors.white.withOpacity(0.10)
+        : Colors.white.withOpacity(0.5);
 
-    return RepaintBoundary(
-      child: ClipRRect(
-      borderRadius: borderRadius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: baseTint.withOpacity(opacity),
-            borderRadius: borderRadius,
-            border: border ?? Border.all(color: borderColor, width: 1),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: brightness == Brightness.dark
-                  ? [
-                      Colors.white.withOpacity(0.08),
-                      Colors.white.withOpacity(0.02),
-                    ]
-                  : [
-                      Colors.white.withOpacity(0.7),
-                      Colors.white.withOpacity(0.2),
-                    ],
-            ),
-          ),
-          child: child,
+    // Simple container — no BackdropFilter for performance + compatibility
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: baseTint.withOpacity(opacity),
+        borderRadius: borderRadius,
+        border: border ?? Border.all(color: borderColor, width: 0.5),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: brightness == Brightness.dark
+              ? [
+                  Colors.white.withOpacity(0.07),
+                  Colors.white.withOpacity(0.02),
+                ]
+              : [
+                  Colors.white.withOpacity(0.65),
+                  Colors.white.withOpacity(0.20),
+                ],
         ),
       ),
-      ),
+      child: child,
     );
   }
 }
@@ -80,64 +73,22 @@ class GlassBackground extends StatelessWidget {
             ? [
                 const Color(0xFF0A1A1F),
                 const Color(0xFF0F0F1F),
-                cs.primary.withOpacity(0.25),
+                cs.primary.withOpacity(0.20),
               ]
             : [
                 const Color(0xFFE9F5EA),
                 const Color(0xFFDFEAF4),
-                cs.primary.withOpacity(0.12),
+                cs.primary.withOpacity(0.08),
               ]);
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: palette,
-              ),
-            ),
-          ),
-        ),
-        // soft orbs
-        Positioned(
-          top: -80,
-          left: -60,
-          child: _orb(220, cs.primary.withOpacity(dark ? 0.35 : 0.25)),
-        ),
-        Positioned(
-          top: 180,
-          right: -80,
-          child: _orb(
-            260,
-            (dark ? const Color(0xFF6A1B9A) : const Color(0xFFEF6C00))
-                .withOpacity(dark ? 0.35 : 0.2),
-          ),
-        ),
-        Positioned(
-          bottom: -100,
-          left: -40,
-          child: _orb(
-              240, const Color(0xFF1565C0).withOpacity(dark ? 0.30 : 0.18)),
-        ),
-        Positioned.fill(child: child),
-      ],
-    );
-  }
-
-  Widget _orb(double size, Color color) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, color.withOpacity(0)],
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: palette,
         ),
       ),
+      child: child,
     );
   }
 }

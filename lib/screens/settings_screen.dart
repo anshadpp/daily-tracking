@@ -376,8 +376,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+            Glass(
+              borderRadius: BorderRadius.circular(22),
+              padding: const EdgeInsets.all(16),
+              tint: Colors.red.withOpacity(0.05),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.warning_rounded, color: Colors.red.shade400),
+                    const SizedBox(width: 10),
+                    const Text('Danger zone',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.red)),
+                  ]),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _resetAll(context),
+                      icon: const Icon(Icons.delete_forever_rounded,
+                          color: Colors.red),
+                      label: const Text('Reset all data',
+                          style: TextStyle(color: Colors.red)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _resetAll(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset everything?'),
+        content: const Text(
+            'This permanently deletes ALL your data:\n'
+            '• Schedule blocks & categories\n'
+            '• Completions & history\n'
+            '• Expenses, todos, holidays\n'
+            '• Prayer completions & Qada\n\n'
+            'This cannot be undone. Export a backup first.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reset everything'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('Resetting...'),
+          ],
+        ),
+      ),
+    );
+    await context.read<TrackerProvider>().resetAllData();
+    if (!context.mounted) return;
+    Navigator.pop(context); // dismiss loading
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text('All data has been reset.'),
       ),
     );
   }

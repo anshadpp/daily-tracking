@@ -639,28 +639,35 @@ class AppDatabase {
     await db.delete('todos', where: 'id = ?', whereArgs: [id]);
   }
 
-  // Qada (missed prayers) — check from installDate to yesterday
+  // Qada (missed prayers) — check from installDate to yesterday, batch insert
   Future<void> checkAndInsertQadaRange(
       String installDate, DateTime today) async {
     final db = await database;
     final install = DateTime.parse(installDate);
     final yesterday = today.subtract(const Duration(days: 1));
-    if (yesterday.isBefore(install)) return; // too early
+    if (yesterday.isBefore(install)) return;
 
-    // Iterate each day from install to yesterday
+    // Pre-fetch all completed prayers in the range
+    final startStr = _dateStr(install);
+    final endStr = _dateStr(yesterday);
+    final allCompletions = await db.rawQuery(
+        'SELECT date, prayer FROM prayer_completions '
+        'WHERE date BETWEEN ? AND ? AND completed = 1',
+        [startStr, endStr]);
+    final doneSet = <String>{};
+    for (final r in allCompletions) {
+      doneSet.add('${r['date']}|${r['prayer']}');
+    }
+
+    // Batch insert missing prayers
+    const prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    final batch = db.batch();
     var cursor = install;
     while (!cursor.isAfter(yesterday)) {
       final ds = _dateStr(cursor);
-      final completions = await db.query('prayer_completions',
-          where: 'date = ?', whereArgs: [ds]);
-      final done = <String>{};
-      for (final r in completions) {
-        if ((r['completed'] as int) == 1) done.add(r['prayer'] as String);
-      }
-      const prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
       for (final p in prayers) {
-        if (!done.contains(p)) {
-          await db.insert(
+        if (!doneSet.contains('$ds|$p')) {
+          batch.insert(
             'qada',
             {'prayer': p, 'missed_date': ds, 'made_up': 0},
             conflictAlgorithm: ConflictAlgorithm.ignore,
@@ -669,6 +676,7 @@ class AppDatabase {
       }
       cursor = cursor.add(const Duration(days: 1));
     }
+    await batch.commit(noResult: true);
   }
 
   Future<List<Qada>> getPendingQada() async {
@@ -721,12 +729,46 @@ class AppDatabase {
 
   Future<void> addManualQada(String date, List<String> prayers) async {
     final db = await database;
+    final batch = db.batch();
     for (final p in prayers) {
-      await db.insert(
+      batch.insert(
         'qada',
         {'prayer': p, 'missed_date': date, 'made_up': 0},
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> addBulkQadaRange(
+      String fromDate, String toDate, List<String> prayers) async {
+    final db = await database;
+    final from = DateTime.parse(fromDate);
+    final to = DateTime.parse(toDate);
+    final batch = db.batch();
+    var cursor = from;
+    while (!cursor.isAfter(to)) {
+      final ds = _dateStr(cursor);
+      for (final p in prayers) {
+        batch.insert(
+          'qada',
+          {'prayer': p, 'missed_date': ds, 'made_up': 0},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+      cursor = cursor.add(const Duration(days: 1));
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> resetAllData() async {
+    final db = await database;
+    final tables = [
+      'categories', 'blocks', 'completions', 'holidays',
+      'prayer_completions', 'expenses', 'todos', 'qada',
+    ];
+    for (final t in tables) {
+      await db.delete(t);
     }
   }
 

@@ -415,14 +415,15 @@ class TrackerProvider extends ChangeNotifier {
 
   Future<void> addBulkQada(
       DateTime from, DateTime to, List<String> prayers) async {
-    var cursor = from;
-    while (!cursor.isAfter(to)) {
-      await _db.addManualQada(_dateStr(cursor), prayers);
-      cursor = cursor.add(const Duration(days: 1));
-    }
+    await _db.addBulkQadaRange(_dateStr(from), _dateStr(to), prayers);
     _pendingQada = await _db.getPendingQada();
     notifyListeners();
     _pushWidget();
+  }
+
+  Future<void> resetAllData() async {
+    await _db.resetAllData();
+    await load();
   }
 
   Future<void> rescheduleNotifications() async {

@@ -167,19 +167,41 @@ class _QadaScreenState extends State<QadaScreen> {
                               selected.isEmpty ||
                               to!.isBefore(from!))
                           ? null
-                          : () {
+                          : () async {
                               final days =
                                   to!.difference(from!).inDays + 1;
-                              tp.addBulkQada(
-                                  from!, to!, selected.toList());
+                              final total = selected.length * days;
                               Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  behavior: SnackBarBehavior.floating,
-                                  content: Text(
-                                      'Added ${selected.length * days} Qada ($days days × ${selected.length} prayers)'),
-                                ),
-                              );
+                              // Show loading for large inserts
+                              if (total > 50) {
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (_) => AlertDialog(
+                                    content: Row(
+                                      children: [
+                                        const CircularProgressIndicator(),
+                                        const SizedBox(width: 20),
+                                        Text('Adding $total Qada...'),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+                              await tp.addBulkQada(
+                                  from!, to!, selected.toList());
+                              if (total > 50 && context.mounted) {
+                                Navigator.pop(context); // dismiss loading
+                              }
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    behavior: SnackBarBehavior.floating,
+                                    content: Text(
+                                        'Added $total Qada ($days days × ${selected.length} prayers)'),
+                                  ),
+                                );
+                              }
                             },
                       child: Text(
                           'Add ${selected.length} prayers × ${from != null && to != null ? to!.difference(from!).inDays + 1 : 0} days'),
