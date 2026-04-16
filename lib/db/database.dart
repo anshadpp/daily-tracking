@@ -680,9 +680,40 @@ class AppDatabase {
 
   Future<void> markQadaDone(int id) async {
     final db = await database;
+    // Get the qada record to also update prayer_completions
+    final rows = await db.query('qada', where: 'id = ?', whereArgs: [id]);
     await db.update(
       'qada',
       {'made_up': 1, 'made_up_date': _dateStr(DateTime.now())},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    // Mark in prayer_completions too so calendar reflects it
+    if (rows.isNotEmpty) {
+      final q = rows.first;
+      final date = q['missed_date'] as String;
+      final prayer = q['prayer'] as String;
+      final existing = await db.query('prayer_completions',
+          where: 'date = ? AND prayer = ?', whereArgs: [date, prayer]);
+      if (existing.isEmpty) {
+        await db.insert('prayer_completions', {
+          'date': date,
+          'prayer': prayer,
+          'completed': 1,
+          'completed_at_minutes': null,
+        });
+      } else {
+        await db.update('prayer_completions', {'completed': 1},
+            where: 'date = ? AND prayer = ?', whereArgs: [date, prayer]);
+      }
+    }
+  }
+
+  Future<void> undoQadaMadeUp(int id) async {
+    final db = await database;
+    await db.update(
+      'qada',
+      {'made_up': 0, 'made_up_date': null},
       where: 'id = ?',
       whereArgs: [id],
     );

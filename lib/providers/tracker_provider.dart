@@ -225,6 +225,15 @@ class TrackerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get isViewingPastDate {
+    final now = DateTime.now();
+    return _selectedDate.year < now.year ||
+        (_selectedDate.year == now.year &&
+            (_selectedDate.month < now.month ||
+                (_selectedDate.month == now.month &&
+                    _selectedDate.day < now.day)));
+  }
+
   Future<void> togglePrayer(PrayerInstance p) async {
     final now = DateTime.now();
     await _db.setPrayerCompletion(
@@ -235,6 +244,23 @@ class TrackerProvider extends ChangeNotifier {
     );
     _prayerCompletions = await _db.getPrayerCompletions(_selectedDateStr);
     notifyListeners();
+    _pushWidget();
+  }
+
+  /// Mark a past prayer as Qada made-up (inserts into qada table too)
+  Future<void> markPastPrayerAsQada(PrayerInstance p) async {
+    await _db.addManualQada(_selectedDateStr, [p.name.key]);
+    // Then mark it as made up
+    final pending = await _db.getPendingQada();
+    final match = pending.where(
+        (q) => q.prayer == p.name.key && q.missedDate == _selectedDateStr);
+    if (match.isNotEmpty) {
+      await _db.markQadaDone(match.first.id!);
+    }
+    _prayerCompletions = await _db.getPrayerCompletions(_selectedDateStr);
+    _pendingQada = await _db.getPendingQada();
+    notifyListeners();
+    _pushWidget();
   }
 
   Future<void> setBlockTimeOverride(
@@ -367,13 +393,23 @@ class TrackerProvider extends ChangeNotifier {
   Future<void> markQadaDone(Qada q) async {
     await _db.markQadaDone(q.id!);
     _pendingQada = await _db.getPendingQada();
+    _prayerCompletions = await _db.getPrayerCompletions(_selectedDateStr);
     notifyListeners();
+    _pushWidget();
+  }
+
+  Future<void> undoQadaMadeUp(Qada q) async {
+    await _db.undoQadaMadeUp(q.id!);
+    _pendingQada = await _db.getPendingQada();
+    notifyListeners();
+    _pushWidget();
   }
 
   Future<void> addManualQada(DateTime date, List<String> prayers) async {
     await _db.addManualQada(_dateStr(date), prayers);
     _pendingQada = await _db.getPendingQada();
     notifyListeners();
+    _pushWidget();
   }
 
   Future<void> rescheduleNotifications() async {

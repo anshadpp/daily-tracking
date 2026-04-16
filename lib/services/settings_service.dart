@@ -20,6 +20,8 @@ class AppSettings {
   String asrJuristic = 'standard';
   String currencySymbol = '₹';
   String? installDate; // YYYY-MM-DD, set on first run
+  bool locationPicked = false;
+  bool onboardingDone = false;
 
   static final AppSettings _i = AppSettings._();
   AppSettings._();
@@ -36,6 +38,8 @@ class AppSettings {
     asrJuristic = p.getString(_kAsrJuristic) ?? asrJuristic;
     currencySymbol = p.getString(_kCurrency) ?? currencySymbol;
     installDate = p.getString(_kInstallDate);
+    locationPicked = p.getBool('location_picked') ?? false;
+    onboardingDone = p.getBool('onboarding_done') ?? false;
     if (installDate == null) {
       final now = DateTime.now();
       installDate =
@@ -54,6 +58,8 @@ class AppSettings {
     await p.setBool(_kPrayerReminders, prayerReminders);
     await p.setString(_kAsrJuristic, asrJuristic);
     await p.setString(_kCurrency, currencySymbol);
+    await p.setBool('location_picked', locationPicked);
+    await p.setBool('onboarding_done', onboardingDone);
   }
 }
 

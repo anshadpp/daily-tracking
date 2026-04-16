@@ -129,7 +129,7 @@ class _TodayScreenState extends State<TodayScreen> {
             for (final p in prayers)
               _PrayerCard(
                 prayer: p,
-                onToggle: () => tp.togglePrayer(p),
+                onToggle: () => _handlePrayerToggle(context, tp, p),
               ),
             const SizedBox(height: 8),
           ],
@@ -254,6 +254,38 @@ class _TodayScreenState extends State<TodayScreen> {
       }
     }
     return best;
+  }
+
+  void _handlePrayerToggle(
+      BuildContext context, TrackerProvider tp, PrayerInstance p) async {
+    if (tp.isViewingPastDate && !p.completed) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Mark ${p.name.label}?'),
+          content: const Text(
+              'This is a past date. Is this a Qada (make-up prayer)?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, 'cancel'),
+                child: const Text('Cancel')),
+            OutlinedButton(
+                onPressed: () => Navigator.pop(ctx, 'regular'),
+                child: const Text('Regular mark')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, 'qada'),
+                child: const Text('Mark as Qada')),
+          ],
+        ),
+      );
+      if (choice == 'qada') {
+        tp.markPastPrayerAsQada(p);
+      } else if (choice == 'regular') {
+        tp.togglePrayer(p);
+      }
+    } else {
+      tp.togglePrayer(p);
+    }
   }
 
   void _addTodo(BuildContext context, TrackerProvider tp) {

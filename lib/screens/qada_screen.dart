@@ -43,7 +43,7 @@ class _QadaScreenState extends State<QadaScreen> {
     final date = await showDatePicker(
       context: context,
       initialDate: DateTime.now().subtract(const Duration(days: 1)),
-      firstDate: DateTime(2020),
+      firstDate: DateTime(2000),
       lastDate: DateTime.now(),
     );
     if (date == null || !context.mounted) return;
@@ -171,6 +171,21 @@ class _QadaScreenState extends State<QadaScreen> {
                   onMarkDone: (q) async {
                     await tp.markQadaDone(q);
                     setState(() => _future = _load());
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        behavior: SnackBarBehavior.floating,
+                        content: Text(
+                            '${q.prayerLabel} (${q.missedDate}) marked as made up'),
+                        action: SnackBarAction(
+                          label: 'Undo',
+                          onPressed: () async {
+                            await tp.undoQadaMadeUp(q);
+                            setState(() => _future = _load());
+                          },
+                        ),
+                      ),
+                    );
                   },
                 ),
               ] else

@@ -34,9 +34,12 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final initial = await WidgetService.instance.launchedFrom();
       if (initial != null) _handleUri(initial);
-      // Show location picker on first launch
-      if (mounted && AppSettings.I.city == 'Makkah' && _isFirstLaunch()) {
-        _showLocationPicker();
+      // Show onboarding then location picker on first launch
+      if (mounted && !AppSettings.I.onboardingDone) {
+        await _showOnboarding();
+      }
+      if (mounted && !AppSettings.I.locationPicked) {
+        await _showLocationPicker();
       }
     });
     _widgetSub = WidgetService.instance.onLaunch.listen((uri) {
@@ -44,18 +47,21 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  bool _isFirstLaunch() {
-    // Install date was just set this session if it matches today
-    final today = DateTime.now();
-    final ds =
-        '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    return AppSettings.I.installDate == ds;
+  Future<void> _showOnboarding() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const _OnboardingDialog(),
+    );
+    AppSettings.I.onboardingDone = true;
+    await AppSettings.I.save();
   }
 
-  void _showLocationPicker() {
-    showModalBottomSheet(
+  Future<void> _showLocationPicker() async {
+    await showModalBottomSheet(
       context: context,
       isDismissible: false,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => _LocationPickerSheet(
@@ -63,15 +69,17 @@ class _HomeScreenState extends State<HomeScreen> {
           AppSettings.I.city = city.name;
           AppSettings.I.latitude = city.lat;
           AppSettings.I.longitude = city.lng;
+          AppSettings.I.locationPicked = true;
           await AppSettings.I.save();
-          if (mounted) {
-            await context.read<TrackerProvider>().load();
-            await context.read<TrackerProvider>().rescheduleNotifications();
-          }
           if (ctx.mounted) Navigator.pop(ctx);
         },
       ),
     );
+    // Reload after picker closes
+    if (mounted) {
+      await context.read<TrackerProvider>().load();
+      await context.read<TrackerProvider>().rescheduleNotifications();
+    }
   }
 
   @override
@@ -308,6 +316,131 @@ class _NavItem extends StatelessWidget {
       ),
     );
   }
+}
+
+class _OnboardingDialog extends StatefulWidget {
+  const _OnboardingDialog();
+  @override
+  State<_OnboardingDialog> createState() => _OnboardingDialogState();
+}
+
+class _OnboardingDialogState extends State<_OnboardingDialog> {
+  int _page = 0;
+
+  static const _pages = [
+    _OBPage(
+      icon: Icons.checklist_rounded,
+      title: 'Schedule Blocks',
+      body:
+          'Create time blocks for your day — work, study, meals, rest. '
+          'Tap the tune icon to add blocks. Set which days each block repeats.',
+    ),
+    _OBPage(
+      icon: Icons.mosque_rounded,
+      title: 'Prayer Tracking',
+      body:
+          '5 daily prayers auto-calculated for your location. '
+          'Each has a deadline — if missed it becomes Qada. '
+          'Track and make up missed prayers from the calendar.',
+    ),
+    _OBPage(
+      icon: Icons.task_alt_rounded,
+      title: 'Todos',
+      body:
+          'Free-form tasks not tied to a time. Add from the Today screen. '
+          'Persists until completed. Also visible in your home widget.',
+    ),
+    _OBPage(
+      icon: Icons.account_balance_wallet_rounded,
+      title: 'Expenses',
+      body:
+          'Log daily spending with categories. See daily totals, '
+          'monthly summaries, and a 7-day chart.',
+    ),
+    _OBPage(
+      icon: Icons.widgets_rounded,
+      title: 'Home Widget',
+      body:
+          'Add the widget to your home screen. Mark prayers, todos, '
+          'and blocks done directly from the widget — no need to open the app.',
+    ),
+    _OBPage(
+      icon: Icons.backup_rounded,
+      title: 'Backup & Restore',
+      body:
+          'Export your data as JSON or raw database from Settings. '
+          'Import on a new phone without losing any history.',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final p = _pages[_page];
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(p.icon, size: 48, color: cs.primary),
+          const SizedBox(height: 14),
+          Text(p.title,
+              style: const TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          Text(p.body,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 13, color: cs.onSurfaceVariant, height: 1.5)),
+          const SizedBox(height: 18),
+          // Dots
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_pages.length, (i) {
+              return Container(
+                width: i == _page ? 18 : 6,
+                height: 6,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  color: i == _page
+                      ? cs.primary
+                      : cs.outline.withOpacity(0.3),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+      actions: [
+        if (_page > 0)
+          TextButton(
+            onPressed: () => setState(() => _page--),
+            child: const Text('Back'),
+          ),
+        FilledButton(
+          onPressed: () {
+            if (_page < _pages.length - 1) {
+              setState(() => _page++);
+            } else {
+              Navigator.pop(context);
+            }
+          },
+          child: Text(
+              _page < _pages.length - 1 ? 'Next' : 'Get Started'),
+        ),
+      ],
+    );
+  }
+}
+
+class _OBPage {
+  final IconData icon;
+  final String title;
+  final String body;
+  const _OBPage(
+      {required this.icon, required this.title, required this.body});
 }
 
 class _LocationPickerSheet extends StatelessWidget {

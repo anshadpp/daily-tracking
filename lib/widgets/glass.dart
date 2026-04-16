@@ -14,7 +14,7 @@ class Glass extends StatelessWidget {
   const Glass({
     super.key,
     required this.child,
-    this.blur = 22,
+    this.blur = 12,  // reduced from 22 for better performance
     this.opacity = 0.55,
     this.borderRadius = const BorderRadius.all(Radius.circular(22)),
     this.tint,
@@ -33,7 +33,8 @@ class Glass extends StatelessWidget {
         ? Colors.white.withOpacity(0.12)
         : Colors.white.withOpacity(0.6);
 
-    return ClipRRect(
+    return RepaintBoundary(
+      child: ClipRRect(
       borderRadius: borderRadius,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
@@ -59,6 +60,7 @@ class Glass extends StatelessWidget {
           ),
           child: child,
         ),
+      ),
       ),
     );
   }
