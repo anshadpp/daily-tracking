@@ -20,7 +20,7 @@ class AppDatabase {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dbPath, 'daily_tracker.db'),
-      version: 5,
+      version: 6,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -61,6 +61,7 @@ class AppDatabase {
         completed INTEGER NOT NULL DEFAULT 0,
         completed_at_minutes INTEGER,
         note TEXT,
+        skipped INTEGER NOT NULL DEFAULT 0,
         UNIQUE(block_id, date)
       )
     ''');
@@ -203,6 +204,14 @@ class AppDatabase {
         await db.insert('categories', c.toMap()..remove('id'));
       }
     }
+    if (oldV < 6) {
+      final cols = await db.rawQuery('PRAGMA table_info(completions)');
+      final hasSkipped = cols.any((c) => c['name'] == 'skipped');
+      if (!hasSkipped) {
+        await db.execute(
+            'ALTER TABLE completions ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0');
+      }
+    }
   }
 
   // Categories
@@ -305,6 +314,31 @@ class AppDatabase {
           'completed_at_minutes': completedAtMinutes,
           if (note != null) 'note': note,
         },
+        where: 'block_id = ? AND date = ?',
+        whereArgs: [blockId, date],
+      );
+    }
+  }
+
+  Future<void> setSkipped({
+    required int blockId,
+    required String date,
+    required bool skipped,
+  }) async {
+    final db = await database;
+    final existing = await db.query('completions',
+        where: 'block_id = ? AND date = ?', whereArgs: [blockId, date]);
+    if (existing.isEmpty) {
+      await db.insert('completions', {
+        'block_id': blockId,
+        'date': date,
+        'completed': 0,
+        'skipped': skipped ? 1 : 0,
+      });
+    } else {
+      await db.update(
+        'completions',
+        {'skipped': skipped ? 1 : 0},
         where: 'block_id = ? AND date = ?',
         whereArgs: [blockId, date],
       );

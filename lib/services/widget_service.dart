@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
@@ -25,14 +27,19 @@ class WidgetService {
   Future<void> push({
     required int completed,
     required int total,
+    required List<Block> todayBlocks,
+    required Set<int> completedIds,
     Block? currentBlock,
     AppCategory? currentCategory,
     String? nextTitle,
     DateTime? nextTime,
     List<PrayerInstance> prayers = const [],
+    int prayersDone = 0,
   }) async {
     try {
       final pct = total == 0 ? 0 : (100 * completed / total).round();
+
+      // Live computed fields (for immediate display)
       await HomeWidget.saveWidgetData<String>(
           'headline', currentBlock?.title ?? nextTitle ?? 'All caught up');
       await HomeWidget.saveWidgetData<String>(
@@ -46,16 +53,32 @@ class WidgetService {
       await HomeWidget.saveWidgetData<int>('progress', pct);
       await HomeWidget.saveWidgetData<String>(
           'progressLabel', '$completed / $total');
-      await HomeWidget.saveWidgetData<int>('currentBlockId',
-          currentBlock?.id ?? -1);
+
+      // Full schedule JSON so widget can self-compute on periodic refresh
+      final scheduleJson = jsonEncode({
+        'blocks': todayBlocks
+            .map((b) => {
+                  'id': b.id,
+                  'title': b.title,
+                  'start': b.startMinutes,
+                  'end': b.endMinutes,
+                })
+            .toList(),
+        'completedIds': completedIds.toList(),
+        'totalBlocks': todayBlocks.length,
+        'prayersDone': prayersDone,
+        'prayersTotal': prayers.length,
+      });
+      await HomeWidget.saveWidgetData<String>('schedule', scheduleJson);
 
       final now = DateTime.now();
-      final upcoming = prayers.where((p) => p.time.isAfter(now)).take(3).toList();
+      final upcoming =
+          prayers.where((p) => p.time.isAfter(now)).take(3).toList();
       await HomeWidget.saveWidgetData<String>(
         'prayers',
         upcoming
-            .map(
-                (p) => '${p.name.label}|${DateFormat('HH:mm').format(p.time)}')
+            .map((p) =>
+                '${p.name.label}|${DateFormat('HH:mm').format(p.time)}')
             .join(';'),
       );
 

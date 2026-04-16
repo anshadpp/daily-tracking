@@ -63,8 +63,21 @@ class TrackerProvider extends ChangeNotifier {
   bool isCompleted(int blockId) =>
       _todayCompletions[blockId]?.completed ?? false;
 
+  bool isSkipped(int blockId) =>
+      _todayCompletions[blockId]?.skipped ?? false;
+
+  List<Block> get activeBlocksForSelectedDate =>
+      blocksForSelectedDate
+          .where((b) => b.id == null || !isSkipped(b.id!))
+          .toList();
+
+  List<Block> get skippedBlocksForSelectedDate =>
+      blocksForSelectedDate
+          .where((b) => b.id != null && isSkipped(b.id!))
+          .toList();
+
   int get completedCount {
-    final bs = blocksForSelectedDate;
+    final bs = activeBlocksForSelectedDate;
     int n = bs.where((b) => b.id != null && isCompleted(b.id!)).length;
     for (final p in prayersForSelectedDate) {
       if (p.completed) n++;
@@ -73,7 +86,7 @@ class TrackerProvider extends ChangeNotifier {
   }
 
   int get totalCount =>
-      blocksForSelectedDate.length + prayersForSelectedDate.length;
+      activeBlocksForSelectedDate.length + prayersForSelectedDate.length;
 
   double get progress => totalCount == 0 ? 0 : completedCount / totalCount;
 
@@ -93,10 +106,11 @@ class TrackerProvider extends ChangeNotifier {
     final cat = cur != null ? categoryById[cur.categoryId] : null;
     DateTime? nextTime;
     String? nextTitle;
+    final active = activeBlocksForSelectedDate;
     if (cur == null) {
       final now = DateTime.now();
       final nowMin = now.hour * 60 + now.minute;
-      for (final b in blocksForSelectedDate) {
+      for (final b in active) {
         if (b.startMinutes > nowMin) {
           nextTitle = b.title;
           nextTime = DateTime(now.year, now.month, now.day,
@@ -105,14 +119,23 @@ class TrackerProvider extends ChangeNotifier {
         }
       }
     }
+    final doneIds = <int>{};
+    for (final b in active) {
+      if (b.id != null && isCompleted(b.id!)) doneIds.add(b.id!);
+    }
+    final prayers = prayersForSelectedDate;
+    final prayersDone = prayers.where((p) => p.completed).length;
     WidgetService.instance.push(
       completed: completedCount,
       total: totalCount,
+      todayBlocks: active,
+      completedIds: doneIds,
       currentBlock: cur,
       currentCategory: cat,
       nextTitle: nextTitle,
       nextTime: nextTime,
-      prayers: prayersForSelectedDate,
+      prayers: prayers,
+      prayersDone: prayersDone,
     );
   }
 
@@ -155,6 +178,24 @@ class TrackerProvider extends ChangeNotifier {
     );
     _prayerCompletions = await _db.getPrayerCompletions(_selectedDateStr);
     notifyListeners();
+  }
+
+  Future<void> skipBlock(Block b) async {
+    if (b.id == null) return;
+    await _db.setSkipped(
+        blockId: b.id!, date: _selectedDateStr, skipped: true);
+    _todayCompletions = await _db.getCompletionsForDate(_selectedDateStr);
+    notifyListeners();
+    _pushWidget();
+  }
+
+  Future<void> unskipBlock(Block b) async {
+    if (b.id == null) return;
+    await _db.setSkipped(
+        blockId: b.id!, date: _selectedDateStr, skipped: false);
+    _todayCompletions = await _db.getCompletionsForDate(_selectedDateStr);
+    notifyListeners();
+    _pushWidget();
   }
 
   Future<void> setNote(Block b, String note) async {

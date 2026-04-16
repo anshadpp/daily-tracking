@@ -40,9 +40,10 @@ class _TodayScreenState extends State<TodayScreen> {
     final tp = context.watch<TrackerProvider>();
     final isToday = _sameDay(tp.selectedDate, DateTime.now());
     final current = isToday ? tp.currentBlock : null;
-    final blocks = tp.blocksForSelectedDate;
+    final activeBlocks = tp.activeBlocksForSelectedDate;
+    final skippedBlocks = tp.skippedBlocksForSelectedDate;
     final prayers = tp.prayersForSelectedDate;
-    final next = isToday ? _nextItem(blocks, prayers) : null;
+    final next = isToday ? _nextItem(activeBlocks, prayers) : null;
     final cats = tp.categoryById;
     final holiday = tp.todayHoliday;
 
@@ -116,19 +117,28 @@ class _TodayScreenState extends State<TodayScreen> {
               ),
             const SizedBox(height: 8),
           ],
-          if (blocks.isNotEmpty) ...[
+          if (activeBlocks.isNotEmpty) ...[
             const _SectionHeader('Schedule', Icons.view_agenda_rounded),
-            for (final b in blocks)
+            for (final b in activeBlocks)
               BlockCard(
                 block: b,
                 category: cats[b.categoryId],
                 completed: b.id != null && tp.isCompleted(b.id!),
                 isCurrent: current?.id == b.id,
                 onToggle: () => tp.toggle(b),
-                onLongPress: () => _editNote(context, tp, b),
+                onLongPress: () => _showBlockMenu(context, tp, b),
               ),
           ],
-          if (blocks.isEmpty && prayers.isEmpty)
+          if (skippedBlocks.isNotEmpty) ...[
+            const _SectionHeader('Skipped today', Icons.skip_next_rounded),
+            for (final b in skippedBlocks)
+              _SkippedCard(
+                block: b,
+                category: cats[b.categoryId],
+                onRestore: () => tp.unskipBlock(b),
+              ),
+          ],
+          if (activeBlocks.isEmpty && prayers.isEmpty && skippedBlocks.isEmpty)
             Padding(
               padding: const EdgeInsets.all(32),
               child: Center(
@@ -166,6 +176,50 @@ class _TodayScreenState extends State<TodayScreen> {
       }
     }
     return best;
+  }
+
+  void _showBlockMenu(BuildContext context, TrackerProvider tp, Block b) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Glass(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(b.title,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.skip_next_rounded),
+              title: const Text('Skip for today'),
+              subtitle: const Text("Won't count toward progress"),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              onTap: () {
+                tp.skipBlock(b);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.note_alt_rounded),
+              title: const Text('Add note'),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              onTap: () {
+                Navigator.pop(context);
+                _editNote(context, tp, b);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _editNote(BuildContext context, TrackerProvider tp, Block b) {
@@ -555,6 +609,54 @@ class _ProgressHero extends StatelessWidget {
     if (d.inMinutes < 1) return 'now';
     if (d.inMinutes < 60) return '${d.inMinutes} min';
     return '${d.inHours}h ${d.inMinutes % 60}m';
+  }
+}
+
+class _SkippedCard extends StatelessWidget {
+  final Block block;
+  final AppCategory? category;
+  final VoidCallback onRestore;
+  const _SkippedCard({
+    required this.block,
+    required this.category,
+    required this.onRestore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Glass(
+        borderRadius: BorderRadius.circular(18),
+        opacity: 0.4,
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        child: Row(
+          children: [
+            Icon(Icons.skip_next_rounded,
+                color: cs.onSurfaceVariant, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                block.title,
+                style: TextStyle(
+                  color: cs.onSurfaceVariant,
+                  decoration: TextDecoration.lineThrough,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Text(block.rangeLabel,
+                style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onRestore,
+              child: const Text('Restore'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
