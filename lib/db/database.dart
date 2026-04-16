@@ -688,6 +688,17 @@ class AppDatabase {
     );
   }
 
+  Future<void> addManualQada(String date, List<String> prayers) async {
+    final db = await database;
+    for (final p in prayers) {
+      await db.insert(
+        'qada',
+        {'prayer': p, 'missed_date': date, 'made_up': 0},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+  }
+
   Future<int> pendingQadaCount() async {
     final db = await database;
     return Sqflite.firstIntValue(await db.rawQuery(

@@ -38,12 +38,105 @@ class _QadaScreenState extends State<QadaScreen> {
     });
   }
 
+  Future<void> _addManualQada(
+      BuildContext context, TrackerProvider tp) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(const Duration(days: 1)),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (date == null || !context.mounted) return;
+
+    final selected = <String>{};
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Glass(
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(28)),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Missed prayers — ${DateFormat('d MMM yyyy').format(date)}',
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text('Select which prayers you missed on this day.',
+                  style: Theme.of(ctx).textTheme.bodySmall),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  for (final p in ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'])
+                    FilterChip(
+                      label: Text(
+                          p[0].toUpperCase() + p.substring(1)),
+                      avatar: const Icon(Icons.mosque_rounded, size: 16),
+                      selected: selected.contains(p),
+                      onSelected: (v) => setSheet(() {
+                        if (v) {
+                          selected.add(p);
+                        } else {
+                          selected.remove(p);
+                        }
+                      }),
+                    ),
+                  _SelectAllChip(
+                    allSelected: selected.length == 5,
+                    onTap: () => setSheet(() {
+                      if (selected.length == 5) {
+                        selected.clear();
+                      } else {
+                        selected.addAll(
+                            ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']);
+                      }
+                    }),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: selected.isEmpty
+                      ? null
+                      : () {
+                          tp.addManualQada(date, selected.toList());
+                          Navigator.pop(ctx);
+                        },
+                  child: Text('Add ${selected.length} Qada'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    setState(() => _future = _load());
+  }
+
   @override
   Widget build(BuildContext context) {
     final tp = context.watch<TrackerProvider>();
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Qada & Prayer Calendar')),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: FloatingActionButton.extended(
+          onPressed: () => _addManualQada(context, tp),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Add missed prayer'),
+        ),
+      ),
       body: FutureBuilder<_QadaBundle>(
         future: _future,
         builder: (ctx, snap) {
@@ -549,5 +642,25 @@ class _PendingQadaList extends StatelessWidget {
     } catch (_) {
       return ds;
     }
+  }
+}
+
+class _SelectAllChip extends StatelessWidget {
+  final bool allSelected;
+  final VoidCallback onTap;
+  const _SelectAllChip({required this.allSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      label: Text(allSelected ? 'Deselect all' : 'Select all'),
+      avatar: Icon(
+        allSelected
+            ? Icons.deselect_rounded
+            : Icons.select_all_rounded,
+        size: 16,
+      ),
+      onPressed: onTap,
+    );
   }
 }

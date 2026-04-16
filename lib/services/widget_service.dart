@@ -177,6 +177,8 @@ Future<void> widgetBackgroundCallback(Uri? uri) async {
       final nowMin = now.hour * 60 + now.minute;
       final dateStr =
           '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      // Toggle in DB
       final existing = await db.query('prayer_completions',
           where: 'date = ? AND prayer = ?',
           whereArgs: [dateStr, prayerKey]);
@@ -196,7 +198,8 @@ Future<void> widgetBackgroundCallback(Uri? uri) async {
           whereArgs: [dateStr, prayerKey],
         );
       }
-      // Re-read and update widget prayer data
+
+      // Rebuild prayersJson from scratch (don't rely on cached data)
       final allPC = await db.query('prayer_completions',
           where: 'date = ?', whereArgs: [dateStr]);
       final doneSet = <String>{};
@@ -205,25 +208,40 @@ Future<void> widgetBackgroundCallback(Uri? uri) async {
           doneSet.add(r['prayer'] as String);
         }
       }
-      // Re-read existing prayersJson and update completed flags
-      final oldJson = await HomeWidget.getWidgetData<String>('prayersJson');
-      if (oldJson != null) {
-        final list = jsonDecode(oldJson) as List;
-        final updated = list.map((item) {
-          final m = Map<String, dynamic>.from(item as Map);
-          m['completed'] = doneSet.contains(m['key']);
-          return m;
-        }).toList();
-        await HomeWidget.saveWidgetData<String>(
-            'prayersJson', jsonEncode(updated));
-      }
+      const prayerDefs = [
+        {'key': 'fajr', 'label': 'Fajr'},
+        {'key': 'dhuhr', 'label': 'Dhuhr'},
+        {'key': 'asr', 'label': 'Asr'},
+        {'key': 'maghrib', 'label': 'Maghrib'},
+        {'key': 'isha', 'label': 'Isha'},
+      ];
+      final freshJson = jsonEncode(prayerDefs.map((d) {
+        final k = d['key'] as String;
+        return {
+          'key': k,
+          'label': d['label'],
+          'time': '',
+          'deadline': '',
+          'completed': doneSet.contains(k),
+          'isQada': false,
+        };
+      }).toList());
+      await HomeWidget.saveWidgetData<String>('prayersJson', freshJson);
+
+      // Update qada display
+      final qadaPrayers = prayerDefs
+          .where((d) => !doneSet.contains(d['key']))
+          .map((d) => d['label'] as String)
+          .toList();
+      await HomeWidget.saveWidgetData<String>(
+          'qada', qadaPrayers.isEmpty ? '' : qadaPrayers.join(', '));
+
       await db.close();
       await HomeWidget.updateWidget(
         qualifiedAndroidName:
             'com.example.daily_tracker.DailyTrackerWidgetProvider',
       );
     } else if (uri.host == 'refresh') {
-      // Just trigger a widget redraw with existing data
       await HomeWidget.updateWidget(
         qualifiedAndroidName:
             'com.example.daily_tracker.DailyTrackerWidgetProvider',

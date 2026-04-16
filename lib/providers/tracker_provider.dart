@@ -344,6 +344,12 @@ class TrackerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> addManualQada(DateTime date, List<String> prayers) async {
+    await _db.addManualQada(_dateStr(date), prayers);
+    _pendingQada = await _db.getPendingQada();
+    notifyListeners();
+  }
+
   Future<void> rescheduleNotifications() async {
     await NotificationService.instance.rescheduleAll(_blocks, categoryById);
   }
