@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/prayer.dart';
 import '../providers/tracker_provider.dart';
+import '../services/backup_service.dart';
 import '../services/prayer_service.dart';
 import '../services/settings_service.dart';
 import '../widgets/glass.dart';
@@ -304,6 +305,236 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+            Glass(
+              borderRadius: BorderRadius.circular(22),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.backup_rounded,
+                        color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 10),
+                    const Text('Backup & Restore',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w800)),
+                  ]),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Export your data to transfer to another device, or restore a previous backup.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 16),
+                  const _SectionLabel('EXPORT'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _BackupButton(
+                          icon: Icons.data_object_rounded,
+                          label: 'JSON',
+                          sublabel: 'Human-readable, all tables',
+                          onTap: () => _export(context, 'json'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _BackupButton(
+                          icon: Icons.storage_rounded,
+                          label: 'Database',
+                          sublabel: 'Raw .db file, fastest',
+                          onTap: () => _export(context, 'db'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const _SectionLabel('IMPORT'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _BackupButton(
+                          icon: Icons.upload_file_rounded,
+                          label: 'From JSON',
+                          sublabel: 'Pick .json backup',
+                          onTap: () => _importJson(context),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _BackupButton(
+                          icon: Icons.file_open_rounded,
+                          label: 'From .db',
+                          sublabel: 'Pick database file',
+                          onTap: () => _importDb(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _export(BuildContext context, String type) async {
+    final scaffold = ScaffoldMessenger.of(context);
+    scaffold.showSnackBar(
+      const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Preparing export...')),
+    );
+    final path = type == 'json'
+        ? await BackupService.instance.exportJson()
+        : await BackupService.instance.exportDb();
+    if (!context.mounted) return;
+    scaffold.hideCurrentSnackBar();
+    if (path != null) {
+      scaffold.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Exported to $path'),
+        ),
+      );
+    } else {
+      scaffold.showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Export failed'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _importJson(BuildContext context) async {
+    final confirmed = await _confirmImport(context);
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+    final (ok, count) = await BackupService.instance.importJson();
+    if (!context.mounted) return;
+    if (ok) {
+      await context.read<TrackerProvider>().load();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Imported $count records. Data restored.'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Import failed. Check the file format.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _importDb(BuildContext context) async {
+    final confirmed = await _confirmImport(context);
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+    final (ok, msg) = await BackupService.instance.importDb();
+    if (!context.mounted) return;
+    if (ok) {
+      await context.read<TrackerProvider>().load();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(msg.isEmpty ? 'Database restored.' : msg),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(msg.isEmpty ? 'Import failed.' : msg),
+        ),
+      );
+    }
+  }
+
+  Future<bool?> _confirmImport(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Replace all data?'),
+        content: const Text(
+            'Importing will erase your current data and replace it with '
+            'the backup. This cannot be undone.\n\n'
+            'Export your current data first if you want to keep it.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Replace'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.5,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      );
+}
+
+class _BackupButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String sublabel;
+  final VoidCallback onTap;
+  const _BackupButton({
+    required this.icon,
+    required this.label,
+    required this.sublabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.outline.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: cs.primary, size: 22),
+            const SizedBox(height: 8),
+            Text(label,
+                style:
+                    const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+            const SizedBox(height: 2),
+            Text(sublabel,
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
           ],
         ),
       ),
