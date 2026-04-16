@@ -511,9 +511,16 @@ class _PrayerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     const prayerColor = Color(0xFF00695C);
-    final now = DateTime.now();
-    final isNow = now.isAfter(prayer.time) &&
-        now.isBefore(prayer.time.add(const Duration(minutes: 45)));
+    final isActive = prayer.isActiveNow;
+    final isQada = prayer.isQadaNow;
+    final borderColor = isQada
+        ? Colors.red.withOpacity(0.6)
+        : isActive
+            ? prayerColor.withOpacity(0.6)
+            : Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withOpacity(0.08)
+                : Colors.white.withOpacity(0.6);
+    final tintColor = isQada ? Colors.red.withOpacity(0.06) : null;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
@@ -522,13 +529,10 @@ class _PrayerCard extends StatelessWidget {
         child: Glass(
           borderRadius: BorderRadius.circular(20),
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          tint: tintColor,
           border: Border.all(
-            color: isNow
-                ? prayerColor.withOpacity(0.6)
-                : Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.white.withOpacity(0.6),
-            width: isNow ? 1.5 : 1,
+            color: borderColor,
+            width: (isActive || isQada) ? 1.5 : 1,
           ),
           child: Row(
             children: [
@@ -538,33 +542,75 @@ class _PrayerCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(colors: [
-                    prayerColor.withOpacity(0.35),
-                    prayerColor.withOpacity(0.15),
+                    (isQada ? Colors.red : prayerColor).withOpacity(0.35),
+                    (isQada ? Colors.red : prayerColor).withOpacity(0.15),
                   ]),
-                  border: Border.all(color: prayerColor.withOpacity(0.5)),
+                  border: Border.all(
+                      color: (isQada ? Colors.red : prayerColor)
+                          .withOpacity(0.5)),
                 ),
-                child: Icon(prayer.name.icon, color: prayerColor, size: 20),
+                child: Icon(prayer.name.icon,
+                    color: isQada ? Colors.red : prayerColor, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      prayer.name.label,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: prayer.completed
-                            ? cs.onSurfaceVariant
-                            : cs.onSurface,
-                        decoration: prayer.completed
-                            ? TextDecoration.lineThrough
-                            : null,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          prayer.name.label,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: prayer.completed
+                                ? cs.onSurfaceVariant
+                                : isQada
+                                    ? Colors.red
+                                    : cs.onSurface,
+                            decoration: prayer.completed
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        if (isQada) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'QADA',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (isActive && !prayer.completed) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '${prayer.minutesUntilQada} min left',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: prayer.minutesUntilQada <= 15
+                                  ? Colors.orange
+                                  : cs.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      DateFormat('HH:mm').format(prayer.time),
+                      '${DateFormat('HH:mm').format(prayer.time)} – ${prayer.deadlineLabel}',
                       style: TextStyle(
                         color: cs.onSurfaceVariant,
                         fontFeatures: const [FontFeature.tabularFigures()],
@@ -581,8 +627,9 @@ class _PrayerCard extends StatelessWidget {
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color:
-                        prayer.completed ? prayerColor : Colors.transparent,
+                    color: prayer.completed
+                        ? prayerColor
+                        : Colors.transparent,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: prayer.completed

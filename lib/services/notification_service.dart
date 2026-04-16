@@ -96,6 +96,7 @@ class NotificationService {
           p.time.minute,
         );
         if (fire.isAfter(now)) {
+          // Prayer start notification
           await _schedule(
             id: id++,
             title: '🕌 ${p.name.label}',
@@ -105,6 +106,30 @@ class NotificationService {
             color: prayerColor,
             repeatDaily: false,
             big: 'Time for ${p.name.label} prayer',
+          );
+        }
+
+        // Qada warning: 5 minutes before the prayer window closes
+        final deadlineWarn = tz.TZDateTime(
+          tz.local,
+          p.deadline.year,
+          p.deadline.month,
+          p.deadline.day,
+          p.deadline.hour,
+          p.deadline.minute,
+        ).subtract(const Duration(minutes: 5));
+        if (deadlineWarn.isAfter(now)) {
+          await _schedule(
+            id: id++,
+            title: '⚠ ${p.name.label} is about to become Qada!',
+            body:
+                'Only 5 minutes left. Pray now before ${p.deadlineLabel}.',
+            fire: deadlineWarn,
+            color: const Color(0xFFC62828),
+            repeatDaily: false,
+            big:
+                '${p.name.label} window closes at ${p.deadlineLabel}. '
+                'If missed, it becomes Qada (قضاء) and must be made up.',
           );
         }
       }

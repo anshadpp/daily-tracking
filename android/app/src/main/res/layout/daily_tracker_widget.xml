@@ -92,6 +92,20 @@
         android:ellipsize="end"
         android:visibility="gone" />
 
+    <!-- Qada warning -->
+    <TextView
+        android:id="@+id/widget_qada"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text=""
+        android:textSize="10sp"
+        android:textColor="#FFEF5350"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:visibility="gone" />
+
     <!-- Todos (3 slots) -->
     <LinearLayout
         android:id="@+id/widget_todo_section"

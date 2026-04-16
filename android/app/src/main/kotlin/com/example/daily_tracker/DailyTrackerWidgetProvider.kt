@@ -134,6 +134,15 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_prayers, android.view.View.GONE)
             }
 
+            // Qada warning
+            val qadaStr = data.getString("qada", "") ?: ""
+            if (qadaStr.isNotEmpty()) {
+                views.setTextViewText(R.id.widget_qada, "⚠ Qada: $qadaStr")
+                views.setViewVisibility(R.id.widget_qada, android.view.View.VISIBLE)
+            } else {
+                views.setViewVisibility(R.id.widget_qada, android.view.View.GONE)
+            }
+
             // Todos
             try {
                 val todosArr = JSONArray(todosStr)

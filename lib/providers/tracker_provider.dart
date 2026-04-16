@@ -319,18 +319,21 @@ class TrackerProvider extends ChangeNotifier {
     ));
     _activeTodos = await _db.getActiveTodos();
     notifyListeners();
+    _pushWidget();
   }
 
   Future<void> toggleTodo(Todo t) async {
     await _db.toggleTodo(t.id!, !t.completed);
     _activeTodos = await _db.getActiveTodos();
     notifyListeners();
+    _pushWidget();
   }
 
   Future<void> deleteTodo(int id) async {
     await _db.deleteTodo(id);
     _activeTodos = await _db.getActiveTodos();
     notifyListeners();
+    _pushWidget();
   }
 
   // Qada

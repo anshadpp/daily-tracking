@@ -92,6 +92,14 @@ class WidgetService {
             .join(';'),
       );
 
+      // Qada status: prayers whose window passed and not completed
+      final qadaNow = prayers
+          .where((p) => p.isQadaNow)
+          .map((p) => p.name.label)
+          .toList();
+      await HomeWidget.saveWidgetData<String>(
+          'qada', qadaNow.isEmpty ? '' : qadaNow.join(', '));
+
       await HomeWidget.updateWidget(
         qualifiedAndroidName: _providerClass,
       );
@@ -157,7 +165,6 @@ Future<void> widgetBackgroundCallback(Uri? uri) async {
             'com.example.daily_tracker.DailyTrackerWidgetProvider',
       );
     } else if (uri.host == 'toggle-current') {
-      // Toggle current block in DB
       final dbPath = await getDatabasesPath();
       final db = await openDatabase(p.join(dbPath, 'daily_tracker.db'));
       final now = DateTime.now();
@@ -194,6 +201,25 @@ Future<void> widgetBackgroundCallback(Uri? uri) async {
               whereArgs: [currentBlockId, dateStr]);
         }
       }
+      // Re-compute schedule for widget
+      final allCompletions = await db.query('completions',
+          where: 'date = ? AND completed = 1', whereArgs: [dateStr]);
+      final doneIds = allCompletions
+          .map((r) => r['block_id'] as int)
+          .toList();
+      final scheduleJson = jsonEncode({
+        'blocks': blocks
+            .map((b) => {
+                  'id': b['id'] as int,
+                  'title': b['title'] as String,
+                  'start': b['start_minutes'] as int,
+                  'end': b['end_minutes'] as int,
+                })
+            .toList(),
+        'completedIds': doneIds,
+        'totalBlocks': blocks.length,
+      });
+      await HomeWidget.saveWidgetData<String>('schedule', scheduleJson);
       await db.close();
       await HomeWidget.updateWidget(
         qualifiedAndroidName:

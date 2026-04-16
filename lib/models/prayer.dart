@@ -39,8 +39,15 @@ extension PrayerNameX on PrayerName {
 class PrayerInstance {
   final PrayerName name;
   final DateTime time;
+  final DateTime deadline; // when this prayer becomes Qada
   final bool completed;
-  PrayerInstance({required this.name, required this.time, this.completed = false});
+
+  PrayerInstance({
+    required this.name,
+    required this.time,
+    required this.deadline,
+    this.completed = false,
+  });
 
   int get minutesFromMidnight => time.hour * 60 + time.minute;
 
@@ -48,6 +55,29 @@ class PrayerInstance {
     final h = time.hour.toString().padLeft(2, '0');
     final m = time.minute.toString().padLeft(2, '0');
     return '$h:$m';
+  }
+
+  String get deadlineLabel {
+    final h = deadline.hour.toString().padLeft(2, '0');
+    final m = deadline.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  /// True if the prayer window has passed and it wasn't completed.
+  bool get isQadaNow {
+    if (completed) return false;
+    return DateTime.now().isAfter(deadline);
+  }
+
+  /// True if currently within the prayer window.
+  bool get isActiveNow {
+    final now = DateTime.now();
+    return now.isAfter(time) && now.isBefore(deadline);
+  }
+
+  /// Minutes remaining before it becomes Qada. Negative if already Qada.
+  int get minutesUntilQada {
+    return deadline.difference(DateTime.now()).inMinutes;
   }
 }
 
