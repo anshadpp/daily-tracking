@@ -401,12 +401,25 @@ class TrackerProvider extends ChangeNotifier {
   Future<void> undoQadaMadeUp(Qada q) async {
     await _db.undoQadaMadeUp(q.id!);
     _pendingQada = await _db.getPendingQada();
+    _prayerCompletions = await _db.getPrayerCompletions(_selectedDateStr);
     notifyListeners();
     _pushWidget();
   }
 
   Future<void> addManualQada(DateTime date, List<String> prayers) async {
     await _db.addManualQada(_dateStr(date), prayers);
+    _pendingQada = await _db.getPendingQada();
+    notifyListeners();
+    _pushWidget();
+  }
+
+  Future<void> addBulkQada(
+      DateTime from, DateTime to, List<String> prayers) async {
+    var cursor = from;
+    while (!cursor.isAfter(to)) {
+      await _db.addManualQada(_dateStr(cursor), prayers);
+      cursor = cursor.add(const Duration(days: 1));
+    }
     _pendingQada = await _db.getPendingQada();
     notifyListeners();
     _pushWidget();

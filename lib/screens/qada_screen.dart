@@ -31,6 +31,170 @@ class _QadaScreenState extends State<QadaScreen> {
     return _QadaBundle(calendar: calendar, stats: stats);
   }
 
+  Future<void> _addBulkQada(
+      BuildContext context, TrackerProvider tp) async {
+    DateTime? from;
+    DateTime? to;
+    final selected = <String>{};
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+            left: 12,
+            right: 12,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 12,
+          ),
+          child: Glass(
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(28)),
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Bulk add missed prayers',
+                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          )),
+                  const SizedBox(height: 4),
+                  Text(
+                      'Select a date range and the same prayers will be added for every day.',
+                      style: Theme.of(ctx).textTheme.bodySmall),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final d = await showDatePicker(
+                              context: ctx,
+                              initialDate: from ??
+                                  DateTime.now()
+                                      .subtract(const Duration(days: 30)),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime.now(),
+                            );
+                            if (d != null) setSheet(() => from = d);
+                          },
+                          icon: const Icon(Icons.calendar_today, size: 16),
+                          label: Text(from == null
+                              ? 'From date'
+                              : DateFormat('d MMM yy').format(from!)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final d = await showDatePicker(
+                              context: ctx,
+                              initialDate: to ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime.now(),
+                            );
+                            if (d != null) setSheet(() => to = d);
+                          },
+                          icon: const Icon(Icons.calendar_today, size: 16),
+                          label: Text(to == null
+                              ? 'To date'
+                              : DateFormat('d MMM yy').format(to!)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (from != null && to != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        '${to!.difference(from!).inDays + 1} days selected',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(ctx).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: [
+                      for (final p in [
+                        'fajr',
+                        'dhuhr',
+                        'asr',
+                        'maghrib',
+                        'isha'
+                      ])
+                        FilterChip(
+                          label: Text(
+                              p[0].toUpperCase() + p.substring(1)),
+                          avatar:
+                              const Icon(Icons.mosque_rounded, size: 16),
+                          selected: selected.contains(p),
+                          onSelected: (v) => setSheet(() {
+                            v ? selected.add(p) : selected.remove(p);
+                          }),
+                        ),
+                      _SelectAllChip(
+                        allSelected: selected.length == 5,
+                        onTap: () => setSheet(() {
+                          if (selected.length == 5) {
+                            selected.clear();
+                          } else {
+                            selected.addAll([
+                              'fajr',
+                              'dhuhr',
+                              'asr',
+                              'maghrib',
+                              'isha'
+                            ]);
+                          }
+                        }),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: (from == null ||
+                              to == null ||
+                              selected.isEmpty ||
+                              to!.isBefore(from!))
+                          ? null
+                          : () {
+                              final days =
+                                  to!.difference(from!).inDays + 1;
+                              tp.addBulkQada(
+                                  from!, to!, selected.toList());
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  behavior: SnackBarBehavior.floating,
+                                  content: Text(
+                                      'Added ${selected.length * days} Qada ($days days × ${selected.length} prayers)'),
+                                ),
+                              );
+                            },
+                      child: Text(
+                          'Add ${selected.length} prayers × ${from != null && to != null ? to!.difference(from!).inDays + 1 : 0} days'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    setState(() => _future = _load());
+  }
+
   void _shiftMonth(int d) {
     setState(() {
       _month = DateTime(_month.year, _month.month + d);
@@ -131,10 +295,22 @@ class _QadaScreenState extends State<QadaScreen> {
       appBar: AppBar(title: const Text('Qada & Prayer Calendar')),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 24),
-        child: FloatingActionButton.extended(
-          onPressed: () => _addManualQada(context, tp),
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Add missed prayer'),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            FloatingActionButton(
+              heroTag: 'bulk',
+              onPressed: () => _addBulkQada(context, tp),
+              child: const Icon(Icons.date_range_rounded),
+            ),
+            const SizedBox(width: 12),
+            FloatingActionButton.extended(
+              heroTag: 'single',
+              onPressed: () => _addManualQada(context, tp),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add missed'),
+            ),
+          ],
         ),
       ),
       body: FutureBuilder<_QadaBundle>(

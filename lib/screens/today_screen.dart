@@ -156,6 +156,16 @@ class _TodayScreenState extends State<TodayScreen> {
                 onRestore: () => tp.unskipBlock(b),
               ),
           ],
+          // Qada summary + recommendation
+          if (tp.pendingQada.isNotEmpty && isToday) ...[
+            _QadaSummaryCard(
+              pending: tp.pendingQada,
+              onTapCalendar: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const QadaScreen()),
+              ),
+            ),
+          ],
           // Qada — missed prayers
           if (tp.pendingQada.isNotEmpty && isToday) ...[
             _QadaBanner(
@@ -258,13 +268,23 @@ class _TodayScreenState extends State<TodayScreen> {
 
   void _handlePrayerToggle(
       BuildContext context, TrackerProvider tp, PrayerInstance p) async {
-    if (tp.isViewingPastDate && !p.completed) {
+    // If already completed, just untoggle
+    if (p.completed) {
+      tp.togglePrayer(p);
+      return;
+    }
+    // Ask qada/regular if: past date OR today but prayer window expired
+    final needsQadaQuestion =
+        tp.isViewingPastDate || p.isQadaNow;
+    if (needsQadaQuestion) {
       final choice = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text('Mark ${p.name.label}?'),
-          content: const Text(
-              'This is a past date. Is this a Qada (make-up prayer)?'),
+          content: Text(
+              p.isQadaNow
+                  ? '${p.name.label} time has passed. Is this a Qada (make-up prayer)?'
+                  : 'This is a past date. Is this a Qada (make-up prayer)?'),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, 'cancel'),
@@ -952,6 +972,122 @@ class _ProgressHero extends StatelessWidget {
     if (d.inMinutes < 1) return 'now';
     if (d.inMinutes < 60) return '${d.inMinutes} min';
     return '${d.inHours}h ${d.inMinutes % 60}m';
+  }
+}
+
+class _QadaSummaryCard extends StatelessWidget {
+  final List<Qada> pending;
+  final VoidCallback onTapCalendar;
+  const _QadaSummaryCard(
+      {required this.pending, required this.onTapCalendar});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    // Count per prayer
+    final counts = <String, int>{};
+    for (final q in pending) {
+      counts[q.prayer] = (counts[q.prayer] ?? 0) + 1;
+    }
+    // Recommendation based on Islamic guidance
+    final nextPrayer = _recommendQada(pending);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: GestureDetector(
+        onTap: onTapCalendar,
+        child: Glass(
+          borderRadius: BorderRadius.circular(22),
+          padding: const EdgeInsets.all(16),
+          tint: Colors.orange.withOpacity(0.06),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '${pending.length}',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.red.shade400,
+                      height: 1,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Pending Qada',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: Colors.red.shade400,
+                            )),
+                        Text(
+                          counts.entries
+                              .map((e) =>
+                                  '${e.key[0].toUpperCase()}${e.key.substring(1)}: ${e.value}')
+                              .join(' · '),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded,
+                      color: cs.onSurfaceVariant),
+                ],
+              ),
+              if (nextPrayer != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00695C).withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: const Color(0xFF00695C).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.lightbulb_rounded,
+                          size: 16, color: Color(0xFF00695C)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          nextPrayer,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF00695C),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _recommendQada(List<Qada> pending) {
+    if (pending.isEmpty) return null;
+    // Find the oldest missed prayer
+    final oldest = pending.first; // already sorted ASC
+    final label =
+        oldest.prayer[0].toUpperCase() + oldest.prayer.substring(1);
+    // Islamic recommendation: scholars recommend praying Qada
+    // before or after the corresponding current prayer
+    const prayerOrder = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    final idx = prayerOrder.indexOf(oldest.prayer);
+    final companion = prayerOrder[idx]; // same prayer
+    return 'Scholars recommend: Pray your oldest Qada $label '
+        'before or after today\'s $companion prayer. '
+        '(${pending.length} total pending)';
   }
 }
 
