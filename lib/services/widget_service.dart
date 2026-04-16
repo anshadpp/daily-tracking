@@ -1,12 +1,16 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:sqflite/sqflite.dart';
 
 import '../models/block.dart';
 import '../models/category.dart';
 import '../models/prayer.dart';
+import '../models/todo.dart';
 
 class WidgetService {
   WidgetService._();
@@ -19,8 +23,9 @@ class WidgetService {
   Future<void> init() async {
     try {
       await HomeWidget.setAppGroupId(_groupId);
+      await HomeWidget.registerInteractivityCallback(widgetBackgroundCallback);
     } catch (e) {
-      debugPrint('WidgetService.init setAppGroupId failed: $e');
+      debugPrint('WidgetService.init failed: $e');
     }
   }
 
@@ -29,6 +34,7 @@ class WidgetService {
     required int total,
     required List<Block> todayBlocks,
     required Set<int> completedIds,
+    required List<Todo> todos,
     Block? currentBlock,
     AppCategory? currentCategory,
     String? nextTitle,
@@ -39,7 +45,6 @@ class WidgetService {
     try {
       final pct = total == 0 ? 0 : (100 * completed / total).round();
 
-      // Live computed fields (for immediate display)
       await HomeWidget.saveWidgetData<String>(
           'headline', currentBlock?.title ?? nextTitle ?? 'All caught up');
       await HomeWidget.saveWidgetData<String>(
@@ -54,7 +59,6 @@ class WidgetService {
       await HomeWidget.saveWidgetData<String>(
           'progressLabel', '$completed / $total');
 
-      // Full schedule JSON so widget can self-compute on periodic refresh
       final scheduleJson = jsonEncode({
         'blocks': todayBlocks
             .map((b) => {
@@ -70,6 +74,12 @@ class WidgetService {
         'prayersTotal': prayers.length,
       });
       await HomeWidget.saveWidgetData<String>('schedule', scheduleJson);
+
+      // Save todos (first 3 active) for widget display
+      final todosJson = jsonEncode(
+        todos.take(3).map((t) => {'id': t.id, 'title': t.title}).toList(),
+      );
+      await HomeWidget.saveWidgetData<String>('todos', todosJson);
 
       final now = DateTime.now();
       final upcoming =
@@ -100,4 +110,97 @@ class WidgetService {
   }
 
   Stream<Uri?> get onLaunch => HomeWidget.widgetClicked;
+}
+
+/// Runs in a background isolate when the widget fires a background intent.
+@pragma('vm:entry-point')
+Future<void> widgetBackgroundCallback(Uri? uri) async {
+  if (uri == null) return;
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    if (uri.host == 'toggle-todo') {
+      final id = int.tryParse(uri.pathSegments.firstOrNull ?? '');
+      if (id == null) return;
+      final dbPath = await getDatabasesPath();
+      final db = await openDatabase(p.join(dbPath, 'daily_tracker.db'));
+      final now = DateTime.now();
+      final dateStr =
+          '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      // Toggle
+      final rows =
+          await db.query('todos', where: 'id = ?', whereArgs: [id]);
+      if (rows.isNotEmpty) {
+        final current = (rows.first['completed'] as int) == 1;
+        await db.update(
+          'todos',
+          {
+            'completed': current ? 0 : 1,
+            'completed_at': current ? null : dateStr,
+          },
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
+      // Update widget data: re-read active todos
+      final active = await db.query('todos',
+          where: 'completed = 0', orderBy: 'id DESC', limit: 3);
+      final todosJson = jsonEncode(
+        active
+            .map((r) => {'id': r['id'] as int, 'title': r['title'] as String})
+            .toList(),
+      );
+      await HomeWidget.saveWidgetData<String>('todos', todosJson);
+      await db.close();
+      await HomeWidget.updateWidget(
+        qualifiedAndroidName:
+            'com.example.daily_tracker.DailyTrackerWidgetProvider',
+      );
+    } else if (uri.host == 'toggle-current') {
+      // Toggle current block in DB
+      final dbPath = await getDatabasesPath();
+      final db = await openDatabase(p.join(dbPath, 'daily_tracker.db'));
+      final now = DateTime.now();
+      final nowMin = now.hour * 60 + now.minute;
+      final dateStr =
+          '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final blocks = await db.query('blocks',
+          where: 'is_active = 1', orderBy: 'start_minutes ASC');
+      int? currentBlockId;
+      for (final b in blocks) {
+        final start = b['start_minutes'] as int;
+        final end = b['end_minutes'] as int;
+        if (nowMin >= start && nowMin < end) {
+          currentBlockId = b['id'] as int;
+          break;
+        }
+      }
+      if (currentBlockId != null) {
+        final existing = await db.query('completions',
+            where: 'block_id = ? AND date = ?',
+            whereArgs: [currentBlockId, dateStr]);
+        if (existing.isEmpty) {
+          await db.insert('completions', {
+            'block_id': currentBlockId,
+            'date': dateStr,
+            'completed': 1,
+            'completed_at_minutes': nowMin,
+            'skipped': 0,
+          });
+        } else {
+          final cur = (existing.first['completed'] as int) == 1;
+          await db.update('completions', {'completed': cur ? 0 : 1},
+              where: 'block_id = ? AND date = ?',
+              whereArgs: [currentBlockId, dateStr]);
+        }
+      }
+      await db.close();
+      await HomeWidget.updateWidget(
+        qualifiedAndroidName:
+            'com.example.daily_tracker.DailyTrackerWidgetProvider',
+      );
+    }
+  } catch (e) {
+    debugPrint('widgetBackgroundCallback error: $e');
+  }
 }

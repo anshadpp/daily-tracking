@@ -9,6 +9,7 @@ class AppSettings {
   static const _kPrayerReminders = 'prayer_reminders';
   static const _kAsrJuristic = 'asr_juristic';
   static const _kCurrency = 'currency_symbol';
+  static const _kInstallDate = 'install_date';
 
   double latitude = 21.4225;
   double longitude = 39.8262;
@@ -18,6 +19,7 @@ class AppSettings {
   bool prayerReminders = true;
   String asrJuristic = 'standard';
   String currencySymbol = '₹';
+  String? installDate; // YYYY-MM-DD, set on first run
 
   static final AppSettings _i = AppSettings._();
   AppSettings._();
@@ -33,6 +35,13 @@ class AppSettings {
     prayerReminders = p.getBool(_kPrayerReminders) ?? prayerReminders;
     asrJuristic = p.getString(_kAsrJuristic) ?? asrJuristic;
     currencySymbol = p.getString(_kCurrency) ?? currencySymbol;
+    installDate = p.getString(_kInstallDate);
+    if (installDate == null) {
+      final now = DateTime.now();
+      installDate =
+          '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      await p.setString(_kInstallDate, installDate!);
+    }
   }
 
   Future<void> save() async {

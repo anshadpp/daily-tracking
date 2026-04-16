@@ -47,16 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleUri(Uri uri) {
     if (!mounted) return;
-    if (uri.host == 'toggle-current') {
-      final tp = context.read<TrackerProvider>();
-      tp.toggleCurrentFromWidget();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('Toggled current block'),
-        ),
-      );
-    }
+    // Any launch from widget (open, refresh) → just reload latest state
+    context.read<TrackerProvider>().load();
   }
 
   @override

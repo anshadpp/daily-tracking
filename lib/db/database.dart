@@ -639,28 +639,35 @@ class AppDatabase {
     await db.delete('todos', where: 'id = ?', whereArgs: [id]);
   }
 
-  // Qada (missed prayers)
-  Future<void> checkAndInsertQada(String yesterdayDate) async {
+  // Qada (missed prayers) — check from installDate to yesterday
+  Future<void> checkAndInsertQadaRange(
+      String installDate, DateTime today) async {
     final db = await database;
-    final completions = await db.query('prayer_completions',
-        where: 'date = ?', whereArgs: [yesterdayDate]);
-    final done = <String>{};
-    for (final r in completions) {
-      if ((r['completed'] as int) == 1) done.add(r['prayer'] as String);
-    }
-    const prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-    for (final p in prayers) {
-      if (!done.contains(p)) {
-        await db.insert(
-          'qada',
-          {
-            'prayer': p,
-            'missed_date': yesterdayDate,
-            'made_up': 0,
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+    final install = DateTime.parse(installDate);
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (yesterday.isBefore(install)) return; // too early
+
+    // Iterate each day from install to yesterday
+    var cursor = install;
+    while (!cursor.isAfter(yesterday)) {
+      final ds = _dateStr(cursor);
+      final completions = await db.query('prayer_completions',
+          where: 'date = ?', whereArgs: [ds]);
+      final done = <String>{};
+      for (final r in completions) {
+        if ((r['completed'] as int) == 1) done.add(r['prayer'] as String);
       }
+      const prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+      for (final p in prayers) {
+        if (!done.contains(p)) {
+          await db.insert(
+            'qada',
+            {'prayer': p, 'missed_date': ds, 'made_up': 0},
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        }
+      }
+      cursor = cursor.add(const Duration(days: 1));
     }
   }
 

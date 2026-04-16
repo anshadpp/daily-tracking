@@ -10,8 +10,10 @@ import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
 import android.widget.RemoteViews
+import es.antonborri.home_widget.HomeWidgetBackgroundIntent
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetPlugin
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
 
@@ -19,7 +21,7 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
 
     companion object {
         private const val REFRESH_ACTION = "com.example.daily_tracker.WIDGET_REFRESH"
-        private const val INTERVAL_MS: Long = 15 * 60 * 1000  // 15 min
+        private const val INTERVAL_MS: Long = 15 * 60 * 1000
     }
 
     override fun onEnabled(context: Context) {
@@ -58,8 +60,9 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
             var progress = data.getInt("progress", 0)
             var progressLabel = data.getString("progressLabel", "0 / 0") ?: "0 / 0"
             val prayers = data.getString("prayers", "") ?: ""
+            val todosStr = data.getString("todos", "[]") ?: "[]"
 
-            // Self-compute from schedule JSON so widget stays current between app opens
+            // Self-compute from schedule JSON
             val scheduleStr = data.getString("schedule", null)
             if (scheduleStr != null) {
                 try {
@@ -80,7 +83,6 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
                     progress = if (total == 0) 0 else (100 * done / total)
                     progressLabel = "$done / $total"
 
-                    // Find current / next block
                     var foundCurrent = false
                     var nextTitle: String? = null
                     var nextStart = -1
@@ -91,9 +93,9 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
                         val title = b.getString("title")
                         if (nowMin in start until end) {
                             headline = title
-                            val h = end / 60
-                            val m = end % 60
-                            subline = "%02d:%02d – %02d:%02d  •  NOW".format(start / 60, start % 60, h, m)
+                            subline = "%02d:%02d – %02d:%02d  •  NOW".format(
+                                start / 60, start % 60, end / 60, end % 60
+                            )
                             foundCurrent = true
                             break
                         }
@@ -111,9 +113,7 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
                             subline = "Great work today"
                         }
                     }
-                } catch (_: Exception) {
-                    // fallback to saved values
-                }
+                } catch (_: Exception) { }
             }
 
             views.setTextViewText(R.id.widget_title, headline)
@@ -121,10 +121,11 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_progress_label, "$progress%  •  $progressLabel")
             views.setProgressBar(R.id.widget_progress, 100, progress, false)
 
+            // Prayers
             if (prayers.isNotEmpty()) {
                 val parts = prayers.split(";").take(3)
-                val labels = parts.map { segment ->
-                    val kv = segment.split("|")
+                val labels = parts.map { seg ->
+                    val kv = seg.split("|")
                     "${kv.getOrNull(0) ?: ""} ${kv.getOrNull(1) ?: ""}".trim()
                 }
                 views.setTextViewText(R.id.widget_prayers, labels.joinToString("  •  "))
@@ -133,16 +134,51 @@ class DailyTrackerWidgetProvider : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_prayers, android.view.View.GONE)
             }
 
-            val openIntent = HomeWidgetLaunchIntent.getActivity(
+            // Todos
+            try {
+                val todosArr = JSONArray(todosStr)
+                if (todosArr.length() > 0) {
+                    views.setViewVisibility(R.id.widget_todo_section, android.view.View.VISIBLE)
+                    val rowIds = intArrayOf(R.id.widget_todo1_row, R.id.widget_todo2_row, R.id.widget_todo3_row)
+                    val checkIds = intArrayOf(R.id.widget_todo1_check, R.id.widget_todo2_check, R.id.widget_todo3_check)
+                    val textIds = intArrayOf(R.id.widget_todo1_text, R.id.widget_todo2_text, R.id.widget_todo3_text)
+                    for (i in 0 until 3) {
+                        if (i < todosArr.length()) {
+                            val todo = todosArr.getJSONObject(i)
+                            val todoId = todo.getInt("id")
+                            val title = todo.getString("title")
+                            views.setViewVisibility(rowIds[i], android.view.View.VISIBLE)
+                            views.setTextViewText(textIds[i], title)
+                            // Background intent to toggle todo — does NOT open app
+                            val toggleIntent = HomeWidgetBackgroundIntent.getBroadcast(
+                                context,
+                                Uri.parse("dailytracker://toggle-todo/$todoId")
+                            )
+                            views.setOnClickPendingIntent(checkIds[i], toggleIntent)
+                        } else {
+                            views.setViewVisibility(rowIds[i], android.view.View.GONE)
+                        }
+                    }
+                } else {
+                    views.setViewVisibility(R.id.widget_todo_section, android.view.View.GONE)
+                }
+            } catch (_: Exception) {
+                views.setViewVisibility(R.id.widget_todo_section, android.view.View.GONE)
+            }
+
+            // ONLY the app name opens the app
+            val openAppIntent = HomeWidgetLaunchIntent.getActivity(
                 context, MainActivity::class.java, Uri.parse("dailytracker://open")
             )
-            views.setOnClickPendingIntent(R.id.widget_root, openIntent)
+            views.setOnClickPendingIntent(R.id.widget_app_name, openAppIntent)
 
-            val toggleIntent = HomeWidgetLaunchIntent.getActivity(
-                context, MainActivity::class.java, Uri.parse("dailytracker://toggle-current")
+            // Mark current block done — background, no app open
+            val toggleBlockIntent = HomeWidgetBackgroundIntent.getBroadcast(
+                context, Uri.parse("dailytracker://toggle-current")
             )
-            views.setOnClickPendingIntent(R.id.widget_done_btn, toggleIntent)
+            views.setOnClickPendingIntent(R.id.widget_done_btn, toggleBlockIntent)
 
+            // Refresh — opens app to sync latest data
             val refreshIntent = HomeWidgetLaunchIntent.getActivity(
                 context, MainActivity::class.java, Uri.parse("dailytracker://refresh")
             )

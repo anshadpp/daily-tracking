@@ -119,10 +119,10 @@ class TrackerProvider extends ChangeNotifier {
     _todayHoliday = await _db.getHolidayForDate(_selectedDateStr);
     _activeTodos = await _db.getActiveTodos();
 
-    // Check yesterday's missed prayers → insert Qada
-    if (AppSettings.I.prayerEnabled) {
-      final yesterday = DateTime.now().subtract(const Duration(days: 1));
-      await _db.checkAndInsertQada(_dateStr(yesterday));
+    // Check all days from install to yesterday for missed prayers → Qada
+    if (AppSettings.I.prayerEnabled && AppSettings.I.installDate != null) {
+      await _db.checkAndInsertQadaRange(
+          AppSettings.I.installDate!, DateTime.now());
     }
     _pendingQada = await _db.getPendingQada();
 
@@ -159,6 +159,7 @@ class TrackerProvider extends ChangeNotifier {
       total: totalCount,
       todayBlocks: active,
       completedIds: doneIds,
+      todos: _activeTodos,
       currentBlock: cur,
       currentCategory: cat,
       nextTitle: nextTitle,
