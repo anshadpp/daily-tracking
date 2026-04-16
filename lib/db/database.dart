@@ -7,6 +7,8 @@ import '../models/completion.dart';
 import '../models/expense.dart';
 import '../models/holiday.dart';
 import '../models/prayer.dart';
+import '../models/qada.dart';
+import '../models/todo.dart';
 import 'default_blocks.dart';
 
 class AppDatabase {
@@ -20,7 +22,7 @@ class AppDatabase {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dbPath, 'daily_tracker.db'),
-      version: 7,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -97,6 +99,25 @@ class AppDatabase {
       )
     ''');
     await db.execute('CREATE INDEX idx_expenses_date ON expenses(date)');
+    await db.execute('''
+      CREATE TABLE todos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        completed_at TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE qada (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        prayer TEXT NOT NULL,
+        missed_date TEXT NOT NULL,
+        made_up INTEGER NOT NULL DEFAULT 0,
+        made_up_date TEXT,
+        UNIQUE(prayer, missed_date)
+      )
+    ''');
 
     final catIds = <String, int>{};
     for (final c in DefaultCategories.all()) {
@@ -225,6 +246,27 @@ class AppDatabase {
         await db.execute(
             'ALTER TABLE completions ADD COLUMN override_end INTEGER');
       }
+    }
+    if (oldV < 8) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS todos (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          completed INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          completed_at TEXT
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS qada (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          prayer TEXT NOT NULL,
+          missed_date TEXT NOT NULL,
+          made_up INTEGER NOT NULL DEFAULT 0,
+          made_up_date TEXT,
+          UNIQUE(prayer, missed_date)
+        )
+      ''');
     }
   }
 
@@ -555,6 +597,95 @@ class AppDatabase {
       for (final r in rows)
         r['category_id'] as int: (r['s'] as int?) ?? 0,
     };
+  }
+
+  // Todos
+  Future<List<Todo>> getActiveTodos() async {
+    final db = await database;
+    final rows = await db.query('todos',
+        where: 'completed = 0', orderBy: 'id DESC');
+    return rows.map(Todo.fromMap).toList();
+  }
+
+  Future<List<Todo>> getCompletedTodos({int limit = 20}) async {
+    final db = await database;
+    final rows = await db.query('todos',
+        where: 'completed = 1',
+        orderBy: 'completed_at DESC',
+        limit: limit);
+    return rows.map(Todo.fromMap).toList();
+  }
+
+  Future<int> insertTodo(Todo t) async {
+    final db = await database;
+    return db.insert('todos', t.toMap()..remove('id'));
+  }
+
+  Future<void> toggleTodo(int id, bool completed) async {
+    final db = await database;
+    await db.update(
+      'todos',
+      {
+        'completed': completed ? 1 : 0,
+        'completed_at': completed ? _dateStr(DateTime.now()) : null,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> deleteTodo(int id) async {
+    final db = await database;
+    await db.delete('todos', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Qada (missed prayers)
+  Future<void> checkAndInsertQada(String yesterdayDate) async {
+    final db = await database;
+    final completions = await db.query('prayer_completions',
+        where: 'date = ?', whereArgs: [yesterdayDate]);
+    final done = <String>{};
+    for (final r in completions) {
+      if ((r['completed'] as int) == 1) done.add(r['prayer'] as String);
+    }
+    const prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    for (final p in prayers) {
+      if (!done.contains(p)) {
+        await db.insert(
+          'qada',
+          {
+            'prayer': p,
+            'missed_date': yesterdayDate,
+            'made_up': 0,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+    }
+  }
+
+  Future<List<Qada>> getPendingQada() async {
+    final db = await database;
+    final rows = await db.query('qada',
+        where: 'made_up = 0', orderBy: 'missed_date ASC, prayer ASC');
+    return rows.map(Qada.fromMap).toList();
+  }
+
+  Future<void> markQadaDone(int id) async {
+    final db = await database;
+    await db.update(
+      'qada',
+      {'made_up': 1, 'made_up_date': _dateStr(DateTime.now())},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> pendingQadaCount() async {
+    final db = await database;
+    return Sqflite.firstIntValue(await db.rawQuery(
+            'SELECT COUNT(*) FROM qada WHERE made_up = 0')) ??
+        0;
   }
 
   static String _dateStr(DateTime d) {

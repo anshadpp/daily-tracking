@@ -175,18 +175,8 @@ class DefaultCategories {
     kind: CategoryKind.expense,
   );
 
-  static List<AppCategory> allRoutine() => [
-        travel360,
-        incube,
-        rest,
-        exam,
-        skill,
-        meal,
-        prayer,
-        hadith,
-        myCompany,
-        event,
-      ];
+  // No prebuilt routine categories — user creates their own.
+  static List<AppCategory> allRoutine() => [];
 
   static List<AppCategory> allExpense() => [
         expFood,

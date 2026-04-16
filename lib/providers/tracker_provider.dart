@@ -6,6 +6,8 @@ import '../models/category.dart';
 import '../models/completion.dart';
 import '../models/holiday.dart';
 import '../models/prayer.dart';
+import '../models/qada.dart';
+import '../models/todo.dart';
 import '../services/notification_service.dart';
 import '../services/prayer_service.dart';
 import '../services/settings_service.dart';
@@ -20,6 +22,8 @@ class TrackerProvider extends ChangeNotifier {
   Map<String, PrayerCompletion> _prayerCompletions = {};
   List<Holiday> _holidays = [];
   Holiday? _todayHoliday;
+  List<Todo> _activeTodos = [];
+  List<Qada> _pendingQada = [];
   DateTime _selectedDate = DateTime.now();
 
   List<Block> get blocks => _blocks;
@@ -30,6 +34,8 @@ class TrackerProvider extends ChangeNotifier {
       _categories.where((c) => c.kind == CategoryKind.expense).toList();
   List<Holiday> get holidays => _holidays;
   Holiday? get todayHoliday => _todayHoliday;
+  List<Todo> get activeTodos => _activeTodos;
+  List<Qada> get pendingQada => _pendingQada;
   Map<int, AppCategory> get categoryById =>
       {for (final c in _categories) c.id!: c};
   Map<int, Completion> get todayCompletions => _todayCompletions;
@@ -111,6 +117,15 @@ class TrackerProvider extends ChangeNotifier {
     _prayerCompletions = await _db.getPrayerCompletions(_selectedDateStr);
     _holidays = await _db.getHolidays();
     _todayHoliday = await _db.getHolidayForDate(_selectedDateStr);
+    _activeTodos = await _db.getActiveTodos();
+
+    // Check yesterday's missed prayers → insert Qada
+    if (AppSettings.I.prayerEnabled) {
+      final yesterday = DateTime.now().subtract(const Duration(days: 1));
+      await _db.checkAndInsertQada(_dateStr(yesterday));
+    }
+    _pendingQada = await _db.getPendingQada();
+
     notifyListeners();
     _pushWidget();
   }
@@ -293,6 +308,35 @@ class TrackerProvider extends ChangeNotifier {
   Future<void> deleteHoliday(int id) async {
     await _db.deleteHoliday(id);
     await load();
+  }
+
+  // Todos
+  Future<void> addTodo(String title) async {
+    await _db.insertTodo(Todo(
+      title: title,
+      createdAt: _dateStr(DateTime.now()),
+    ));
+    _activeTodos = await _db.getActiveTodos();
+    notifyListeners();
+  }
+
+  Future<void> toggleTodo(Todo t) async {
+    await _db.toggleTodo(t.id!, !t.completed);
+    _activeTodos = await _db.getActiveTodos();
+    notifyListeners();
+  }
+
+  Future<void> deleteTodo(int id) async {
+    await _db.deleteTodo(id);
+    _activeTodos = await _db.getActiveTodos();
+    notifyListeners();
+  }
+
+  // Qada
+  Future<void> markQadaDone(Qada q) async {
+    await _db.markQadaDone(q.id!);
+    _pendingQada = await _db.getPendingQada();
+    notifyListeners();
   }
 
   Future<void> rescheduleNotifications() async {

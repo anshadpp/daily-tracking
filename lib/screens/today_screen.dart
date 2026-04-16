@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import '../models/block.dart';
 import '../models/category.dart';
 import '../models/prayer.dart';
+import '../models/qada.dart';
+import '../models/todo.dart';
 import '../providers/tracker_provider.dart';
 import '../widgets/block_card.dart';
 import '../widgets/glass.dart';
@@ -140,12 +142,32 @@ class _TodayScreenState extends State<TodayScreen> {
                 onRestore: () => tp.unskipBlock(b),
               ),
           ],
-          if (activeBlocks.isEmpty && prayers.isEmpty && skippedBlocks.isEmpty)
+          // Qada — missed prayers
+          if (tp.pendingQada.isNotEmpty && isToday) ...[
+            _QadaBanner(
+              qadaList: tp.pendingQada,
+              onMarkDone: (q) => tp.markQadaDone(q),
+            ),
+          ],
+          // Todos
+          if (isToday) ...[
+            _TodoSection(
+              todos: tp.activeTodos,
+              onToggle: (t) => tp.toggleTodo(t),
+              onDelete: (t) => tp.deleteTodo(t.id!),
+              onAdd: () => _addTodo(context, tp),
+            ),
+          ],
+          if (activeBlocks.isEmpty &&
+              prayers.isEmpty &&
+              skippedBlocks.isEmpty &&
+              tp.activeTodos.isEmpty)
             Padding(
               padding: const EdgeInsets.all(32),
               child: Center(
                 child: Text(
-                  'Nothing scheduled. Open Edit to add blocks.',
+                  'Nothing here yet.\nAdd blocks via Edit, or tap + below for todos.',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                       color:
                           Theme.of(context).colorScheme.onSurfaceVariant),
@@ -178,6 +200,62 @@ class _TodayScreenState extends State<TodayScreen> {
       }
     }
     return best;
+  }
+
+  void _addTodo(BuildContext context, TrackerProvider tp) {
+    final ctrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+          left: 12,
+          right: 12,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 12,
+        ),
+        child: Glass(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'What needs to be done?',
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onSubmitted: (v) {
+                  if (v.trim().isNotEmpty) {
+                    tp.addTodo(v.trim());
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    if (ctrl.text.trim().isNotEmpty) {
+                      tp.addTodo(ctrl.text.trim());
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Add'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showBlockMenu(BuildContext context, TrackerProvider tp, Block b) {
@@ -722,6 +800,202 @@ class _ProgressHero extends StatelessWidget {
     if (d.inMinutes < 1) return 'now';
     if (d.inMinutes < 60) return '${d.inMinutes} min';
     return '${d.inHours}h ${d.inMinutes % 60}m';
+  }
+}
+
+class _QadaBanner extends StatelessWidget {
+  final List<Qada> qadaList;
+  final void Function(Qada) onMarkDone;
+  const _QadaBanner({required this.qadaList, required this.onMarkDone});
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = <String, List<Qada>>{};
+    for (final q in qadaList) {
+      grouped.putIfAbsent(q.missedDate, () => []).add(q);
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Glass(
+        borderRadius: BorderRadius.circular(22),
+        padding: const EdgeInsets.all(16),
+        tint: Colors.red.withOpacity(0.08),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_rounded,
+                    color: Colors.red.shade400, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Qada — Missed prayers (${qadaList.length})',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.red.shade400,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'These prayers were not marked. Make them up as Qada.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 10),
+            for (final entry in grouped.entries) ...[
+              Text(
+                entry.key,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: entry.value.map((q) {
+                  return ActionChip(
+                    label: Text(q.prayerLabel),
+                    avatar: const Icon(Icons.mosque_rounded, size: 16),
+                    onPressed: () => onMarkDone(q),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Text(
+              'Tap a prayer to mark its Qada as made up.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontStyle: FontStyle.italic,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TodoSection extends StatelessWidget {
+  final List<Todo> todos;
+  final void Function(Todo) onToggle;
+  final void Function(Todo) onDelete;
+  final VoidCallback onAdd;
+  const _TodoSection({
+    required this.todos,
+    required this.onToggle,
+    required this.onDelete,
+    required this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 16, 16, 8),
+          child: Row(
+            children: [
+              Icon(Icons.task_alt_rounded,
+                  size: 16, color: cs.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(
+                'TODOS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.6,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: onAdd,
+                child: Glass(
+                  borderRadius: BorderRadius.circular(999),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_rounded, size: 16, color: cs.primary),
+                      const SizedBox(width: 4),
+                      Text('Add',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: cs.primary,
+                          )),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (todos.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
+            child: Text('No pending todos.',
+                style: Theme.of(context).textTheme.bodySmall),
+          ),
+        for (final t in todos)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 3, 16, 3),
+            child: Dismissible(
+              key: ValueKey('todo_${t.id}'),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 24),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.delete_rounded, color: Colors.red),
+              ),
+              onDismissed: (_) => onDelete(t),
+              child: GestureDetector(
+                onTap: () => onToggle(t),
+                child: Glass(
+                  borderRadius: BorderRadius.circular(16),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => onToggle(t),
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: cs.outline.withOpacity(0.6), width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          t.title,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
 
