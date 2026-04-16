@@ -659,30 +659,37 @@ class AppDatabase {
       doneSet.add('${r['date']}|${r['prayer']}');
     }
 
-    // Batch insert missing prayers
+    // Chunked batch insert missing prayers
     const prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-    final batch = db.batch();
     var cursor = install;
     while (!cursor.isAfter(yesterday)) {
-      final ds = _dateStr(cursor);
-      for (final p in prayers) {
-        if (!doneSet.contains('$ds|$p')) {
-          batch.insert(
-            'qada',
-            {'prayer': p, 'missed_date': ds, 'made_up': 0},
-            conflictAlgorithm: ConflictAlgorithm.ignore,
-          );
+      final batch = db.batch();
+      var count = 0;
+      while (!cursor.isAfter(yesterday) && count < 500) {
+        final ds = _dateStr(cursor);
+        for (final p in prayers) {
+          if (!doneSet.contains('$ds|$p')) {
+            batch.insert(
+              'qada',
+              {'prayer': p, 'missed_date': ds, 'made_up': 0},
+              conflictAlgorithm: ConflictAlgorithm.ignore,
+            );
+          }
         }
+        cursor = cursor.add(const Duration(days: 1));
+        count++;
       }
-      cursor = cursor.add(const Duration(days: 1));
+      await batch.commit(noResult: true);
     }
-    await batch.commit(noResult: true);
   }
 
-  Future<List<Qada>> getPendingQada() async {
+  /// Returns only the first [limit] pending qada (for UI display).
+  Future<List<Qada>> getPendingQada({int limit = 50}) async {
     final db = await database;
     final rows = await db.query('qada',
-        where: 'made_up = 0', orderBy: 'missed_date ASC, prayer ASC');
+        where: 'made_up = 0',
+        orderBy: 'missed_date ASC, prayer ASC',
+        limit: limit);
     return rows.map(Qada.fromMap).toList();
   }
 
@@ -717,6 +724,29 @@ class AppDatabase {
     }
   }
 
+  Future<void> markQadaByDatePrayer(String date, String prayer) async {
+    final db = await database;
+    await db.update(
+      'qada',
+      {'made_up': 1, 'made_up_date': _dateStr(DateTime.now())},
+      where: 'missed_date = ? AND prayer = ? AND made_up = 0',
+      whereArgs: [date, prayer],
+    );
+    // Also mark in prayer_completions
+    final existing = await db.query('prayer_completions',
+        where: 'date = ? AND prayer = ?', whereArgs: [date, prayer]);
+    if (existing.isEmpty) {
+      await db.insert('prayer_completions', {
+        'date': date,
+        'prayer': prayer,
+        'completed': 1,
+      });
+    } else {
+      await db.update('prayer_completions', {'completed': 1},
+          where: 'date = ? AND prayer = ?', whereArgs: [date, prayer]);
+    }
+  }
+
   Future<void> undoQadaMadeUp(int id) async {
     final db = await database;
     await db.update(
@@ -745,20 +775,25 @@ class AppDatabase {
     final db = await database;
     final from = DateTime.parse(fromDate);
     final to = DateTime.parse(toDate);
-    final batch = db.batch();
+    // Chunk into batches of 500 days to avoid OOM / ANR
     var cursor = from;
     while (!cursor.isAfter(to)) {
-      final ds = _dateStr(cursor);
-      for (final p in prayers) {
-        batch.insert(
-          'qada',
-          {'prayer': p, 'missed_date': ds, 'made_up': 0},
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+      final batch = db.batch();
+      var count = 0;
+      while (!cursor.isAfter(to) && count < 500) {
+        final ds = _dateStr(cursor);
+        for (final p in prayers) {
+          batch.insert(
+            'qada',
+            {'prayer': p, 'missed_date': ds, 'made_up': 0},
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        }
+        cursor = cursor.add(const Duration(days: 1));
+        count++;
       }
-      cursor = cursor.add(const Duration(days: 1));
+      await batch.commit(noResult: true);
     }
-    await batch.commit(noResult: true);
   }
 
   Future<void> resetAllData() async {
