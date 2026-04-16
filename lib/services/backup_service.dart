@@ -5,7 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:share_plus/share_plus.dart' show Share, XFile;
 import 'package:sqflite/sqflite.dart';
 
 class BackupService {
@@ -53,12 +53,10 @@ class BackupService {
       final file = File(p.join(dir.path, 'daily_tracker_backup_$ts.json'));
       await file.writeAsString(json);
 
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          subject: 'Daily Tracker Backup',
-          text: 'Daily Tracker backup — $ts',
-        ),
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: 'Daily Tracker Backup',
+        text: 'Daily Tracker backup — $ts',
       );
 
       return file.path;
@@ -84,12 +82,10 @@ class BackupService {
       final dest = File(p.join(dir.path, 'daily_tracker_$ts.db'));
       await src.copy(dest.path);
 
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(dest.path)],
-          subject: 'Daily Tracker Database',
-          text: 'Daily Tracker database backup — $ts',
-        ),
+      await Share.shareXFiles(
+        [XFile(dest.path)],
+        subject: 'Daily Tracker Database',
+        text: 'Daily Tracker database backup — $ts',
       );
 
       return dest.path;

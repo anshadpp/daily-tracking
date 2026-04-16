@@ -66,9 +66,10 @@ class TrackerProvider extends ChangeNotifier {
     if (!AppSettings.I.prayerEnabled) return const [];
     final computed = PrayerService.instance.forDate(_selectedDate);
     return computed
-        .map((p) => PrayerInstance(
+        .map<PrayerInstance>((p) => PrayerInstance(
               name: p.name,
               time: p.time,
+              deadline: p.deadline,
               completed:
                   _prayerCompletions[p.name.key]?.completed ?? false,
             ))
