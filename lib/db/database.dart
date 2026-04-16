@@ -695,6 +695,46 @@ class AppDatabase {
         0;
   }
 
+  /// Prayer completion map for a month: date → {prayer: completed}
+  Future<Map<String, Map<String, bool>>> getPrayerCalendar(
+      int year, int month) async {
+    final db = await database;
+    final prefix =
+        '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
+    final rows = await db.rawQuery(
+        "SELECT date, prayer, completed FROM prayer_completions WHERE date LIKE '$prefix-%'");
+    final result = <String, Map<String, bool>>{};
+    for (final r in rows) {
+      final d = r['date'] as String;
+      final p = r['prayer'] as String;
+      final c = (r['completed'] as int) == 1;
+      result.putIfAbsent(d, () => {});
+      result[d]![p] = c;
+    }
+    return result;
+  }
+
+  /// Qada stats: pending per prayer, total pending, total made up
+  Future<Map<String, int>> getQadaStats() async {
+    final db = await database;
+    final pending = await db.rawQuery(
+        'SELECT prayer, COUNT(*) AS c FROM qada WHERE made_up = 0 GROUP BY prayer');
+    final madeUp = Sqflite.firstIntValue(await db.rawQuery(
+            'SELECT COUNT(*) FROM qada WHERE made_up = 1')) ??
+        0;
+    final totalPending = Sqflite.firstIntValue(await db.rawQuery(
+            'SELECT COUNT(*) FROM qada WHERE made_up = 0')) ??
+        0;
+    final result = <String, int>{
+      'total_pending': totalPending,
+      'total_made_up': madeUp,
+    };
+    for (final r in pending) {
+      result[r['prayer'] as String] = r['c'] as int;
+    }
+    return result;
+  }
+
   static String _dateStr(DateTime d) {
     final y = d.year.toString().padLeft(4, '0');
     final m = d.month.toString().padLeft(2, '0');

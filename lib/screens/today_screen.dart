@@ -11,8 +11,10 @@ import '../models/prayer.dart';
 import '../models/qada.dart';
 import '../models/todo.dart';
 import '../providers/tracker_provider.dart';
+import '../services/settings_service.dart';
 import '../widgets/block_card.dart';
 import '../widgets/glass.dart';
+import 'qada_screen.dart';
 
 class TodayScreen extends StatefulWidget {
   const TodayScreen({super.key});
@@ -147,6 +149,46 @@ class _TodayScreenState extends State<TodayScreen> {
             _QadaBanner(
               qadaList: tp.pendingQada,
               onMarkDone: (q) => tp.markQadaDone(q),
+              onTapExpand: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const QadaScreen()),
+              ),
+            ),
+          ] else if (isToday && AppSettings.I.prayerEnabled) ...[
+            // Small link to prayer calendar even when no qada
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const QadaScreen()),
+                ),
+                child: Glass(
+                  borderRadius: BorderRadius.circular(14),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_month_rounded,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text('Prayer Calendar & Qada',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: Theme.of(context).colorScheme.primary,
+                          )),
+                      const Spacer(),
+                      Icon(Icons.chevron_right_rounded,
+                          size: 18,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
           // Todos
@@ -853,7 +895,9 @@ class _ProgressHero extends StatelessWidget {
 class _QadaBanner extends StatelessWidget {
   final List<Qada> qadaList;
   final void Function(Qada) onMarkDone;
-  const _QadaBanner({required this.qadaList, required this.onMarkDone});
+  final VoidCallback? onTapExpand;
+  const _QadaBanner(
+      {required this.qadaList, required this.onMarkDone, this.onTapExpand});
 
   @override
   Widget build(BuildContext context) {
@@ -915,11 +959,26 @@ class _QadaBanner extends StatelessWidget {
               ),
               const SizedBox(height: 8),
             ],
-            Text(
-              'Tap a prayer to mark its Qada as made up.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontStyle: FontStyle.italic,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Tap a prayer to mark its Qada as made up.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                        ),
                   ),
+                ),
+                if (onTapExpand != null)
+                  TextButton.icon(
+                    onPressed: onTapExpand,
+                    icon: const Icon(Icons.calendar_month_rounded, size: 16),
+                    label: const Text('Calendar'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.red.shade400,
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
