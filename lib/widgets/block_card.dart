@@ -9,6 +9,7 @@ class BlockCard extends StatelessWidget {
   final AppCategory? category;
   final bool completed;
   final bool isCurrent;
+  final bool timeOverridden;
   final VoidCallback onToggle;
   final VoidCallback? onLongPress;
 
@@ -18,6 +19,7 @@ class BlockCard extends StatelessWidget {
     required this.category,
     required this.completed,
     required this.isCurrent,
+    this.timeOverridden = false,
     required this.onToggle,
     this.onLongPress,
   });
@@ -102,6 +104,12 @@ class BlockCard extends StatelessWidget {
                         children: [
                           Text(block.rangeLabel),
                           Text('  •  ${block.durationMinutes} min'),
+                          if (timeOverridden) ...[
+                            const SizedBox(width: 6),
+                            Icon(Icons.edit_calendar_rounded,
+                                size: 13,
+                                color: cs.primary.withOpacity(0.8)),
+                          ],
                           if (category != null) ...[
                             const SizedBox(width: 8),
                             _CategoryPill(

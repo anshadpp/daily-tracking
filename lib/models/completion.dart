@@ -6,6 +6,8 @@ class Completion {
   final int? completedAtMinutes;
   final String? note;
   final bool skipped;
+  final int? overrideStart; // minutes from midnight, null = use default
+  final int? overrideEnd;
 
   Completion({
     this.id,
@@ -15,7 +17,11 @@ class Completion {
     this.completedAtMinutes,
     this.note,
     this.skipped = false,
+    this.overrideStart,
+    this.overrideEnd,
   });
+
+  bool get hasTimeOverride => overrideStart != null || overrideEnd != null;
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -25,6 +31,8 @@ class Completion {
         'completed_at_minutes': completedAtMinutes,
         'note': note,
         'skipped': skipped ? 1 : 0,
+        'override_start': overrideStart,
+        'override_end': overrideEnd,
       };
 
   factory Completion.fromMap(Map<String, dynamic> m) => Completion(
@@ -35,5 +43,7 @@ class Completion {
         completedAtMinutes: m['completed_at_minutes'] as int?,
         note: m['note'] as String?,
         skipped: (m['skipped'] as int? ?? 0) == 1,
+        overrideStart: m['override_start'] as int?,
+        overrideEnd: m['override_end'] as int?,
       );
 }

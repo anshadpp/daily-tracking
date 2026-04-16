@@ -38,9 +38,23 @@ class TrackerProvider extends ChangeNotifier {
 
   AppCategory? categoryFor(Block b) => categoryById[b.categoryId];
 
-  List<Block> get blocksForSelectedDate =>
-      _blocks.where((b) => b.occursOn(_selectedDate)).toList()
-        ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+  List<Block> get blocksForSelectedDate {
+    final raw = _blocks.where((b) => b.occursOn(_selectedDate)).toList();
+    // Apply per-day time overrides from completions
+    final withOverrides = raw.map((b) {
+      if (b.id == null) return b;
+      final c = _todayCompletions[b.id!];
+      if (c != null && c.hasTimeOverride) {
+        return b.copyWith(
+          startMinutes: c.overrideStart ?? b.startMinutes,
+          endMinutes: c.overrideEnd ?? b.endMinutes,
+        );
+      }
+      return b;
+    }).toList();
+    withOverrides.sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+    return withOverrides;
+  }
 
   List<PrayerInstance> get prayersForSelectedDate {
     if (!AppSettings.I.prayerEnabled) return const [];
@@ -179,6 +193,36 @@ class TrackerProvider extends ChangeNotifier {
     _prayerCompletions = await _db.getPrayerCompletions(_selectedDateStr);
     notifyListeners();
   }
+
+  Future<void> setBlockTimeOverride(
+      Block b, int startMin, int endMin) async {
+    if (b.id == null) return;
+    await _db.setTimeOverride(
+      blockId: b.id!,
+      date: _selectedDateStr,
+      startMinutes: startMin,
+      endMinutes: endMin,
+    );
+    _todayCompletions = await _db.getCompletionsForDate(_selectedDateStr);
+    notifyListeners();
+    _pushWidget();
+  }
+
+  Future<void> clearBlockTimeOverride(Block b) async {
+    if (b.id == null) return;
+    await _db.setTimeOverride(
+      blockId: b.id!,
+      date: _selectedDateStr,
+      startMinutes: null,
+      endMinutes: null,
+    );
+    _todayCompletions = await _db.getCompletionsForDate(_selectedDateStr);
+    notifyListeners();
+    _pushWidget();
+  }
+
+  bool hasTimeOverride(int blockId) =>
+      _todayCompletions[blockId]?.hasTimeOverride ?? false;
 
   Future<void> skipBlock(Block b) async {
     if (b.id == null) return;

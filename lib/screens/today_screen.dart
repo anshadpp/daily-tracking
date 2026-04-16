@@ -125,6 +125,8 @@ class _TodayScreenState extends State<TodayScreen> {
                 category: cats[b.categoryId],
                 completed: b.id != null && tp.isCompleted(b.id!),
                 isCurrent: current?.id == b.id,
+                timeOverridden:
+                    b.id != null && tp.hasTimeOverride(b.id!),
                 onToggle: () => tp.toggle(b),
                 onLongPress: () => _showBlockMenu(context, tp, b),
               ),
@@ -179,6 +181,7 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   void _showBlockMenu(BuildContext context, TrackerProvider tp, Block b) {
+    final hasOverride = b.id != null && tp.hasTimeOverride(b.id!);
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -194,7 +197,34 @@ class _TodayScreenState extends State<TodayScreen> {
                     .textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(b.rangeLabel,
+                style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.schedule_rounded),
+              title: const Text('Change time today'),
+              subtitle: Text(hasOverride
+                  ? 'Currently overridden'
+                  : 'Only for today, default stays'),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              onTap: () {
+                Navigator.pop(context);
+                _changeTimeToday(context, tp, b);
+              },
+            ),
+            if (hasOverride)
+              ListTile(
+                leading: const Icon(Icons.restore_rounded),
+                title: const Text('Reset to default time'),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                onTap: () {
+                  tp.clearBlockTimeOverride(b);
+                  Navigator.pop(context);
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.skip_next_rounded),
               title: const Text('Skip for today'),
@@ -217,6 +247,89 @@ class _TodayScreenState extends State<TodayScreen> {
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _changeTimeToday(
+      BuildContext context, TrackerProvider tp, Block b) async {
+    TimeOfDay start = TimeOfDay(
+        hour: b.startMinutes ~/ 60, minute: b.startMinutes % 60);
+    TimeOfDay end = TimeOfDay(
+        hour: b.endMinutes ~/ 60, minute: b.endMinutes % 60);
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => Glass(
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(28)),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Change time — today only',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      )),
+              const SizedBox(height: 4),
+              Text(
+                'Default: ${b.startLabel} – ${b.endLabel}',
+                style: Theme.of(ctx).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _TimeBtn(
+                      label: 'START',
+                      time: start,
+                      onTap: () async {
+                        final t = await showTimePicker(
+                            context: ctx, initialTime: start);
+                        if (t != null) setState(() => start = t);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _TimeBtn(
+                      label: 'END',
+                      time: end,
+                      onTap: () async {
+                        final t = await showTimePicker(
+                            context: ctx, initialTime: end);
+                        if (t != null) setState(() => end = t);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    final sM = start.hour * 60 + start.minute;
+                    final eM = end.hour * 60 + end.minute;
+                    if (eM <= sM) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('End must be after start')),
+                      );
+                      return;
+                    }
+                    tp.setBlockTimeOverride(b, sM, eM);
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Save for today'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -652,6 +765,48 @@ class _SkippedCard extends StatelessWidget {
             TextButton(
               onPressed: onRestore,
               child: const Text('Restore'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeBtn extends StatelessWidget {
+  final String label;
+  final TimeOfDay time;
+  final VoidCallback onTap;
+  const _TimeBtn(
+      {required this.label, required this.time, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withOpacity(0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.3,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                )),
+            const SizedBox(height: 4),
+            Text(
+              time.format(context),
+              style:
+                  const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
           ],
         ),

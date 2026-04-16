@@ -20,7 +20,7 @@ class AppDatabase {
     final dbPath = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dbPath, 'daily_tracker.db'),
-      version: 6,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -62,6 +62,8 @@ class AppDatabase {
         completed_at_minutes INTEGER,
         note TEXT,
         skipped INTEGER NOT NULL DEFAULT 0,
+        override_start INTEGER,
+        override_end INTEGER,
         UNIQUE(block_id, date)
       )
     ''');
@@ -212,6 +214,18 @@ class AppDatabase {
             'ALTER TABLE completions ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0');
       }
     }
+    if (oldV < 7) {
+      final cols = await db.rawQuery('PRAGMA table_info(completions)');
+      final has = (String n) => cols.any((c) => c['name'] == n);
+      if (!has('override_start')) {
+        await db.execute(
+            'ALTER TABLE completions ADD COLUMN override_start INTEGER');
+      }
+      if (!has('override_end')) {
+        await db.execute(
+            'ALTER TABLE completions ADD COLUMN override_end INTEGER');
+      }
+    }
   }
 
   // Categories
@@ -313,6 +327,37 @@ class AppDatabase {
           'completed': completed ? 1 : 0,
           'completed_at_minutes': completedAtMinutes,
           if (note != null) 'note': note,
+        },
+        where: 'block_id = ? AND date = ?',
+        whereArgs: [blockId, date],
+      );
+    }
+  }
+
+  Future<void> setTimeOverride({
+    required int blockId,
+    required String date,
+    required int? startMinutes,
+    required int? endMinutes,
+  }) async {
+    final db = await database;
+    final existing = await db.query('completions',
+        where: 'block_id = ? AND date = ?', whereArgs: [blockId, date]);
+    if (existing.isEmpty) {
+      await db.insert('completions', {
+        'block_id': blockId,
+        'date': date,
+        'completed': 0,
+        'skipped': 0,
+        'override_start': startMinutes,
+        'override_end': endMinutes,
+      });
+    } else {
+      await db.update(
+        'completions',
+        {
+          'override_start': startMinutes,
+          'override_end': endMinutes,
         },
         where: 'block_id = ? AND date = ?',
         whereArgs: [blockId, date],
