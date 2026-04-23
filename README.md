@@ -1,25 +1,24 @@
-<div align="center">
-  <img src="assets/app_icon.png" alt="Daily Tracker" width="120" />
+<!-- Animated cyan→violet header -->
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:06B6D4,100:A855F7&height=180&section=header&text=Daily%20Tracker&fontSize=58&fontColor=ffffff&fontAlignY=40&desc=Offline-first%20Flutter%20%C2%B7%20No%20cloud%20%C2%B7%20No%20account&descSize=17&descAlignY=65&animation=fadeIn" alt="Daily Tracker" width="100%" />
 
-  <h1>Daily Tracker</h1>
+<div align="center">
+  <img src="assets/app_icon.png" alt="Daily Tracker icon" width="110" />
 
   <p>
-    <strong>An offline-first Flutter app for tracking a real day — not a to-do list.</strong><br/>
-    Block-based schedule, expenses, prayer times, qada, history, streaks —<br/>
-    everything on-device, no cloud, no account, no analytics.
+    <img src="https://readme-typing-svg.demolab.com/?font=Space+Grotesk&size=22&pause=1200&color=06B6D4&center=true&vCenter=true&width=640&lines=Block-based+day+planning;Prayer+times+%C2%B7+Qada+%C2%B7+Expenses;Local+notifications+%C2%B7+SQLite;No+cloud+%C2%B7+No+account+%C2%B7+Fully+offline" alt="features typing"/>
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/Flutter-3.3+-02569B?logo=flutter&logoColor=white&style=flat-square" alt="Flutter 3.3+"/>
-    <img src="https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white&style=flat-square" alt="Android"/>
-    <img src="https://img.shields.io/badge/Storage-SQLite-003B57?logo=sqlite&logoColor=white&style=flat-square" alt="SQLite"/>
-    <img src="https://img.shields.io/badge/Network-none-475569?style=flat-square" alt="No network"/>
+    <img src="https://img.shields.io/badge/Flutter-3.3+-02569B?logo=flutter&logoColor=white&style=for-the-badge" alt="Flutter 3.3+"/>
+    <img src="https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white&style=for-the-badge" alt="Android"/>
+    <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white&style=for-the-badge" alt="SQLite"/>
+    <img src="https://img.shields.io/badge/No_Network-475569?style=for-the-badge" alt="No network"/>
   </p>
 </div>
 
 ---
 
-## Why
+## ▸ Why
 
 I wanted a single offline app that matched how I actually structure my day — a small
 number of time blocks rather than an infinite to-do list — and could also handle a
@@ -27,7 +26,7 @@ few personal things (expenses, prayer times, make-up prayers) without sending an
 data off the device. Every app I tried had a subscription, a cloud backend, or
 missed one of these pieces. Daily Tracker is the version I actually use.
 
-## Features
+## ▸ Features
 
 ### Daily planning
 - **Today** — live checklist with the currently active block highlighted; long-press
@@ -52,7 +51,7 @@ missed one of these pieces. Daily Tracker is the version I actually use.
 - **Backup & share** — export/import data via `share_plus` + `file_picker`
 - **Fully offline** — every byte lives in one SQLite DB on-device
 
-## Architecture
+## ▸ Architecture
 
 ```
 lib/
@@ -78,7 +77,7 @@ lib/
 - **No network calls** — prayer times are computed from coordinates, not fetched.
   Backup is user-initiated and writes to a local file the user chooses to share.
 
-## Tech stack
+## ▸ Tech stack
 
 - **Flutter** 3.3+ · **Dart**
 - **provider** (state), **sqflite** (storage), **fl_chart** (stats charts)
@@ -87,7 +86,7 @@ lib/
 - **share_plus**, **file_picker** (backup/restore)
 - **shared_preferences** (settings), **intl** (locale-aware date formatting)
 
-## Getting started
+## ▸ Getting started
 
 ### 1. Regenerate the Android bootstrap
 
@@ -150,21 +149,21 @@ flutter build apk --release
 # Output: build/app/outputs/flutter-apk/app-release.apk
 ```
 
-## Customizing the default schedule
+## ▸ Customizing the default schedule
 
 The app ships with **no default blocks** — you build your own schedule from scratch.
 If you want a prebuilt seed, edit `lib/db/default_blocks.dart` **before** the first
 run (defaults are inserted only when the database is first created). To re-seed,
 uninstall the app or clear its data and reinstall.
 
-## Roadmap
+## ▸ Roadmap
 
 - iOS build (currently Android-only)
 - Weekly planning view alongside Today
 - Exportable stats (PNG / PDF)
 - Optional encrypted backup to a user-chosen cloud folder
 
-## Author
+## ▸ Author
 
 **Anshad P P** — Full Stack Developer
 
@@ -172,3 +171,6 @@ uninstall the app or clear its data and reinstall.
 [GitHub](https://github.com/anshadpp) ·
 [LinkedIn](https://linkedin.com/in/anshad-p-p) ·
 [Email](mailto:anshad.pp36@gmail.com)
+
+<!-- Closing wave -->
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:A855F7,100:06B6D4&height=80&section=footer&animation=fadeIn" alt="" width="100%" />
